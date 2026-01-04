@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MediaSource MIME Type Test</title>
+</head>
+<body>
+    <h1>MediaSource MIME Type Support Test</h1>
+    <div id="results"></div>
+
+    <script>
+        const mimeTypes = [
+            'video/mp4',
+            'video/mp4; codecs="avc1"',
+            'video/mp4; codecs="avc1.42E01E"',
+            'video/mp4; codecs="avc1.640028"',
+            'video/mp4; codecs="avc1.64001f"',
+            'video/mp4; codecs="avc1.640029"',
+            'video/mp4; codecs="h264"',
+            'video/webm',
+            'video/webm; codecs="vp8"',
+            'video/webm; codecs="vp9"'
+        ];
+
+        const resultsDiv = document.getElementById('results');
+
+        mimeTypes.forEach(mimeType => {
+            const supported = MediaSource.isTypeSupported(mimeType);
+            const result = document.createElement('div');
+            result.style.padding = '5px';
+            result.style.color = supported ? 'green' : 'red';
+            result.textContent = `${mimeType}: ${supported ? '✅ SUPPORTED' : '❌ NOT SUPPORTED'}`;
+            resultsDiv.appendChild(result);
+        });
+    </script>
+</body>
+</html>

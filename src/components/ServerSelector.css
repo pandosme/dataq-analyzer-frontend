@@ -1,0 +1,233 @@
+.server-selector-videox {
+  width: 100%;
+}
+
+.server-list-videox {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.server-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: #2a2a2a;
+  border: 2px solid #3a3a3a;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.server-card:hover {
+  border-color: #1976d2;
+  background: #323232;
+}
+
+.server-card.selected {
+  border-color: #1976d2;
+  background: #2d3e50;
+}
+
+.server-card-content {
+  flex: 1;
+}
+
+.server-card-header {
+  font-size: 0.75em;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.server-card-name {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.server-card-url {
+  font-size: 0.85em;
+  color: #999;
+  font-family: monospace;
+}
+
+.server-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: 16px;
+}
+
+.server-action-btn {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.server-action-btn:hover {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+.server-delete-btn:hover {
+  background: #d32f2f;
+  color: #fff;
+}
+
+.add-server-btn {
+  width: 100%;
+  padding: 14px;
+  background: transparent;
+  border: 2px solid #1976d2;
+  color: #1976d2;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95em;
+  letter-spacing: 0.5px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.add-server-btn:hover {
+  background: #1976d2;
+  color: #fff;
+}
+
+.add-icon {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+/* Form Styles */
+.server-form-videox {
+  padding: 20px;
+  background: #2a2a2a;
+  border-radius: 8px;
+  border: 2px solid #3a3a3a;
+}
+
+.server-form-videox h3 {
+  margin: 0 0 20px 0;
+  color: #fff;
+  font-size: 1.1em;
+}
+
+.form-error {
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 0.9em;
+}
+
+.form-group-videox {
+  margin-bottom: 16px;
+}
+
+.form-group-videox label {
+  display: block;
+  margin-bottom: 8px;
+  color: #ccc;
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.form-group-videox input {
+  width: 100%;
+  padding: 12px;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.95em;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.form-group-videox input:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.form-group-videox input::placeholder {
+  color: #666;
+}
+
+.form-actions-videox {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn-save-videox,
+.btn-cancel-videox {
+  flex: 1;
+  padding: 12px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.95em;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-save-videox {
+  background: #1976d2;
+  color: #fff;
+}
+
+.btn-save-videox:hover {
+  background: #1565c0;
+}
+
+.btn-cancel-videox {
+  background: #3a3a3a;
+  color: #ccc;
+}
+
+.btn-cancel-videox:hover {
+  background: #4a4a4a;
+  color: #fff;
+}
+
+/* Dark Theme - Most styles already in base since it's dark by default */
+.dark-theme .add-server-btn {
+  border-color: #64b5f6;
+  color: #64b5f6;
+}
+
+.dark-theme .add-server-btn:hover {
+  background: #64b5f6;
+  color: #0f0f0f;
+}
+
+.dark-theme .btn-save-videox {
+  background: #64b5f6;
+}
+
+.dark-theme .btn-save-videox:hover {
+  background: #90caf9;
+}
+
+.dark-theme .form-error {
+  background: rgba(244, 67, 54, 0.1);
+  border-color: rgba(244, 67, 54, 0.3);
+  color: #ff6b6b;
+}
