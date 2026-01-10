@@ -8,10 +8,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "docker:build": "docker build --build-arg VITE_API_URL=http://localhost:3000 -t dataq-frontend -f docker/Dockerfile .",
-    "docker:run": "docker run -d -p 80:80 --name dataq-frontend dataq-frontend",
-    "docker:stop": "docker stop dataq-frontend && docker rm dataq-frontend",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "docker:build": "docker build -t pandosme/dataq-frontend:latest -f docker/Dockerfile .",
+    "docker:push": "docker push pandosme/dataq-frontend:latest",
+    "docker:build-push": "npm run docker:build && npm run docker:push",
+    "docker:run": "docker run -d -p 8303:80 -e BACKEND_URL=http://host.docker.internal:3303 --name dataq-frontend pandosme/dataq-frontend:latest",
+    "docker:stop": "docker stop dataq-frontend && docker rm dataq-frontend"
   },
   "dependencies": {
     "axios": "^1.13.2",

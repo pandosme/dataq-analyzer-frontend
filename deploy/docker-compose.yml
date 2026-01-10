@@ -1,0 +1,11 @@
+services:
+  dataq-frontend:
+    image: pandosme/dataq-frontend:latest
+    container_name: dataq-frontend
+    ports:
+      - "${FRONTEND_PORT:-8303}:80"
+    environment:
+      - BACKEND_URL=${BACKEND_URL:-http://host.docker.internal:3303}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

@@ -15,19 +15,36 @@ export const ServerProvider = ({ children }) => {
   const [servers, setServers] = useState([]);
   const [currentServer, setCurrentServer] = useState(null);
 
+  // Default local server (uses nginx proxy - empty URL means same-origin)
+  const defaultLocalServer = {
+    id: 'local',
+    name: 'Local',
+    url: '',
+    isDefault: true,
+  };
+
   // Initialize from localStorage
   useEffect(() => {
     const storedServers = localStorage.getItem('servers');
     const storedCurrentServer = localStorage.getItem('currentServer');
 
+    let loadedServers = [];
     if (storedServers) {
       try {
-        setServers(JSON.parse(storedServers));
+        loadedServers = JSON.parse(storedServers);
       } catch (error) {
         console.error('Failed to parse stored servers:', error);
         localStorage.removeItem('servers');
       }
     }
+
+    // Ensure the default local server is always available
+    const hasLocalServer = loadedServers.some(s => s.id === 'local');
+    if (!hasLocalServer) {
+      loadedServers = [defaultLocalServer, ...loadedServers];
+      localStorage.setItem('servers', JSON.stringify(loadedServers));
+    }
+    setServers(loadedServers);
 
     if (storedCurrentServer) {
       try {
@@ -71,6 +88,12 @@ export const ServerProvider = ({ children }) => {
   };
 
   const deleteServer = (id) => {
+    // Prevent deletion of default local server
+    if (id === 'local') {
+      console.warn('Cannot delete the default local server');
+      return;
+    }
+
     const updatedServers = servers.filter((server) => server.id !== id);
     setServers(updatedServers);
     localStorage.setItem('servers', JSON.stringify(updatedServers));

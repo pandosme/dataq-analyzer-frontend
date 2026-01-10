@@ -12,9 +12,7 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build for production with API URL from build argument
-ARG VITE_API_URL
-ENV VITE_API_URL=${VITE_API_URL}
+# Build for production (no API URL needed - uses nginx proxy)
 RUN npm run build
 
 # ============================================
@@ -22,8 +20,15 @@ RUN npm run build
 # ============================================
 FROM nginx:alpine
 
-# Copy custom nginx configuration
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+# Install envsubst (part of gettext)
+RUN apk add --no-cache gettext
+
+# Copy nginx config template
+COPY docker/nginx.conf.template /etc/nginx/conf.d/default.conf.template
+
+# Copy entrypoint script
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Copy built app from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -31,5 +36,5 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Expose port 80
 EXPOSE 80
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Use entrypoint script to configure nginx at runtime
+ENTRYPOINT ["/entrypoint.sh"]

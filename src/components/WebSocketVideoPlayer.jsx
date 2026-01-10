@@ -15,7 +15,7 @@ import './WebSocketVideoPlayer.css';
  * - End: timestamp + age + postTime (show until after object disappeared)
  * - Duration: preTime + age + postTime
  */
-function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onError, onClose }) {
+function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onError, onClose, onVideoReady }) {
   const { token, server } = useAuth();
   const videoRef = useRef(null);
   const wsRef = useRef(null);
@@ -173,6 +173,38 @@ function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onErr
             console.log('WebSocketVideoPlayer: Set initial playback position to', preTime, 'seconds');
           }
         }
+        // Notify parent of video dimensions for overlay alignment
+        if (onVideoReady && videoRef.current) {
+          const video = videoRef.current;
+          // Calculate rendered video size accounting for object-fit: contain
+          const containerWidth = video.clientWidth;
+          const containerHeight = video.clientHeight;
+          const videoWidth = video.videoWidth;
+          const videoHeight = video.videoHeight;
+
+          if (videoWidth && videoHeight) {
+            const containerRatio = containerWidth / containerHeight;
+            const videoRatio = videoWidth / videoHeight;
+
+            let renderedWidth, renderedHeight;
+            if (videoRatio > containerRatio) {
+              // Video is wider - fit to width
+              renderedWidth = containerWidth;
+              renderedHeight = containerWidth / videoRatio;
+            } else {
+              // Video is taller - fit to height
+              renderedHeight = containerHeight;
+              renderedWidth = containerHeight * videoRatio;
+            }
+
+            onVideoReady({
+              width: renderedWidth,
+              height: renderedHeight,
+              videoWidth,
+              videoHeight
+            });
+          }
+        }
       };
 
       node.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -188,7 +220,7 @@ function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onErr
       }
       videoRef.current = null;
     }
-  }, [preTime]); // Include preTime in dependencies since we use it in the event handler
+  }, [preTime, onVideoReady]); // Include preTime and onVideoReady in dependencies
 
   // Initialize MediaSource when metadata arrives (if video element already attached)
   useEffect(() => {
@@ -214,7 +246,14 @@ function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onErr
 
     const connect = () => {
       // Convert HTTP/HTTPS to WS/WSS
-      const wsUrl = server.url.replace(/^http/, 'ws') + `/ws/video?token=${token}`;
+      // Handle empty/relative URLs (for nginx proxy setup)
+      let wsUrl;
+      if (!server.url || server.url === '') {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        wsUrl = `${wsProtocol}://${window.location.host}/ws/video?token=${token}`;
+      } else {
+        wsUrl = server.url.replace(/^http/, 'ws') + `/ws/video?token=${token}`;
+      }
 
       if (import.meta.env.DEV) {
         console.log('WebSocketVideoPlayer: Connecting to', wsUrl);
@@ -466,6 +505,7 @@ WebSocketVideoPlayer.propTypes = {
   age: PropTypes.number,
   onError: PropTypes.func,
   onClose: PropTypes.func,
+  onVideoReady: PropTypes.func,
 };
 
 export default WebSocketVideoPlayer;

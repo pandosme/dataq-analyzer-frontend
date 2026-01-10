@@ -16,7 +16,9 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
   const [entryArea, setEntryArea] = useState(null);
   const [exitArea, setExitArea] = useState(null);
   const [drawStart, setDrawStart] = useState(null);
+  const [resizeInfo, setResizeInfo] = useState(null); // { area: 'entry'|'exit', handle: string, startX, startY }
   const [videoInfo, setVideoInfo] = useState(null); // { serial, timestamp, preTime, postTime }
+  const [videoDimensions, setVideoDimensions] = useState(null); // { width, height, videoWidth, videoHeight }
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [queryLimit, setQueryLimit] = useState(500); // Maximum number of results to fetch
@@ -72,6 +74,7 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
     // Camera changed - clear selections and areas but keep filters
     setSelectedPath(null);
     setVideoInfo(null);
+    setVideoDimensions(null);
     setEntryArea(null);
     setExitArea(null);
     setDrawingMode(null);
@@ -208,9 +211,12 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
-    // When video is playing, canvas is already sized by onLoadedMetadata
+    // When video is playing, size canvas to match video's rendered dimensions
     // When showing static image, size canvas to match image
-    if (!videoInfo && imageRef.current) {
+    if (videoInfo && videoDimensions) {
+      canvas.width = videoDimensions.videoWidth;
+      canvas.height = videoDimensions.videoHeight;
+    } else if (!videoInfo && imageRef.current) {
       const img = imageRef.current;
       canvas.width = img.width;
       canvas.height = img.height;
@@ -225,30 +231,73 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     }
 
+    // Helper function to draw resize handles
+    const drawResizeHandles = (x, y, w, h, color) => {
+      const handleSize = 8;
+      const halfHandle = handleSize / 2;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1;
+
+      // Corner handles
+      const handles = [
+        { x: x - halfHandle, y: y - halfHandle }, // top-left
+        { x: x + w - halfHandle, y: y - halfHandle }, // top-right
+        { x: x - halfHandle, y: y + h - halfHandle }, // bottom-left
+        { x: x + w - halfHandle, y: y + h - halfHandle }, // bottom-right
+        // Side midpoint handles
+        { x: x + w / 2 - halfHandle, y: y - halfHandle }, // top-center
+        { x: x + w / 2 - halfHandle, y: y + h - halfHandle }, // bottom-center
+        { x: x - halfHandle, y: y + h / 2 - halfHandle }, // left-center
+        { x: x + w - halfHandle, y: y + h / 2 - halfHandle }, // right-center
+      ];
+
+      handles.forEach(handle => {
+        ctx.fillRect(handle.x, handle.y, handleSize, handleSize);
+        ctx.strokeRect(handle.x, handle.y, handleSize, handleSize);
+      });
+    };
+
     // Draw entry area
     if (entryArea) {
-      ctx.strokeStyle = '#00FF00';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([5, 5]);
       const x = (Math.min(entryArea.x1, entryArea.x2) / 1000) * canvas.width;
       const y = (Math.min(entryArea.y1, entryArea.y2) / 1000) * canvas.height;
       const w = (Math.abs(entryArea.x2 - entryArea.x1) / 1000) * canvas.width;
       const h = (Math.abs(entryArea.y2 - entryArea.y1) / 1000) * canvas.height;
-      ctx.strokeRect(x, y, w, h);
+
+      // Filled semi-transparent background
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.15)';
+      ctx.fillRect(x, y, w, h);
+
+      // Border
+      ctx.strokeStyle = '#00FF00';
+      ctx.lineWidth = 3;
       ctx.setLineDash([]);
+      ctx.strokeRect(x, y, w, h);
+
+      // Resize handles
+      drawResizeHandles(x, y, w, h, '#00FF00');
     }
 
     // Draw exit area
     if (exitArea) {
-      ctx.strokeStyle = '#FF0000';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([5, 5]);
       const x = (Math.min(exitArea.x1, exitArea.x2) / 1000) * canvas.width;
       const y = (Math.min(exitArea.y1, exitArea.y2) / 1000) * canvas.height;
       const w = (Math.abs(exitArea.x2 - exitArea.x1) / 1000) * canvas.width;
       const h = (Math.abs(exitArea.y2 - exitArea.y1) / 1000) * canvas.height;
-      ctx.strokeRect(x, y, w, h);
+
+      // Filled semi-transparent background
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
+      ctx.fillRect(x, y, w, h);
+
+      // Border
+      ctx.strokeStyle = '#FF0000';
+      ctx.lineWidth = 3;
       ctx.setLineDash([]);
+      ctx.strokeRect(x, y, w, h);
+
+      // Resize handles
+      drawResizeHandles(x, y, w, h, '#FF0000');
     }
 
     // Draw paths
@@ -295,50 +344,248 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
       ctx.arc(lx, ly, 5, 0, 2 * Math.PI);
       ctx.fill();
     });
-  }, [imageLoaded, filteredPaths, selectedPath, entryArea, exitArea, videoInfo]);
+  }, [imageLoaded, filteredPaths, selectedPath, entryArea, exitArea, videoInfo, videoDimensions]);
 
-  // Handle canvas mouse events for drawing areas
+  // Helper: Check if click is near a resize handle
+  const getHandleAtPosition = (mouseX, mouseY, area, areaType) => {
+    if (!area) return null;
+
+    const handleSize = 12; // Clickable area slightly larger than visual handle
+    const x1 = Math.min(area.x1, area.x2);
+    const y1 = Math.min(area.y1, area.y2);
+    const x2 = Math.max(area.x1, area.x2);
+    const y2 = Math.max(area.y1, area.y2);
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+
+    const handles = [
+      { name: 'top-left', x: x1, y: y1, cursor: 'nwse-resize' },
+      { name: 'top-right', x: x2, y: y1, cursor: 'nesw-resize' },
+      { name: 'bottom-left', x: x1, y: y2, cursor: 'nesw-resize' },
+      { name: 'bottom-right', x: x2, y: y2, cursor: 'nwse-resize' },
+      { name: 'top', x: midX, y: y1, cursor: 'ns-resize' },
+      { name: 'bottom', x: midX, y: y2, cursor: 'ns-resize' },
+      { name: 'left', x: x1, y: midY, cursor: 'ew-resize' },
+      { name: 'right', x: x2, y: midY, cursor: 'ew-resize' },
+    ];
+
+    for (const handle of handles) {
+      if (
+        Math.abs(mouseX - handle.x) < handleSize &&
+        Math.abs(mouseY - handle.y) < handleSize
+      ) {
+        return { handle: handle.name, area: areaType, cursor: handle.cursor };
+      }
+    }
+    return null;
+  };
+
+  // Helper: Check if click is inside an area (for moving)
+  const isPointInsideArea = (mouseX, mouseY, area) => {
+    if (!area) return false;
+    const x1 = Math.min(area.x1, area.x2);
+    const y1 = Math.min(area.y1, area.y2);
+    const x2 = Math.max(area.x1, area.x2);
+    const y2 = Math.max(area.y1, area.y2);
+    return mouseX >= x1 && mouseX <= x2 && mouseY >= y1 && mouseY <= y2;
+  };
+
+  // State for tracking cursor based on hover position
+  const [hoverCursor, setHoverCursor] = useState('default');
+
+  // Handle canvas mouse events for drawing and resizing areas
   const handleCanvasMouseDown = (e) => {
-    if (!drawingMode) return;
-
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 1000;
     const y = ((e.clientY - rect.top) / rect.height) * 1000;
 
-    setDrawStart({ x, y });
+    // First check if clicking on a resize handle (only when not in drawing mode)
+    if (!drawingMode) {
+      // Check entry area handles first
+      const entryHandle = getHandleAtPosition(x, y, entryArea, 'entry');
+      if (entryHandle) {
+        e.preventDefault();
+        e.stopPropagation();
+        setResizeInfo({ ...entryHandle, startX: x, startY: y, originalArea: { ...entryArea }, mode: 'resize' });
+        return;
+      }
+
+      // Check exit area handles
+      const exitHandle = getHandleAtPosition(x, y, exitArea, 'exit');
+      if (exitHandle) {
+        e.preventDefault();
+        e.stopPropagation();
+        setResizeInfo({ ...exitHandle, startX: x, startY: y, originalArea: { ...exitArea }, mode: 'resize' });
+        return;
+      }
+
+      // Check if clicking inside an area (for moving)
+      if (isPointInsideArea(x, y, entryArea)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setResizeInfo({ area: 'entry', startX: x, startY: y, originalArea: { ...entryArea }, mode: 'move' });
+        return;
+      }
+
+      if (isPointInsideArea(x, y, exitArea)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setResizeInfo({ area: 'exit', startX: x, startY: y, originalArea: { ...exitArea }, mode: 'move' });
+        return;
+      }
+    }
+
+    // If in drawing mode, start drawing new area
+    if (drawingMode) {
+      setDrawStart({ x, y });
+    }
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 1000;
+    const y = ((e.clientY - rect.top) / rect.height) * 1000;
+
+    // Update cursor based on hover position when not actively dragging
+    if (!resizeInfo && !drawingMode) {
+      // Check handles first
+      const entryHandle = getHandleAtPosition(x, y, entryArea, 'entry');
+      if (entryHandle) {
+        setHoverCursor(entryHandle.cursor);
+        return;
+      }
+      const exitHandle = getHandleAtPosition(x, y, exitArea, 'exit');
+      if (exitHandle) {
+        setHoverCursor(exitHandle.cursor);
+        return;
+      }
+      // Check if inside area (for move cursor)
+      if (isPointInsideArea(x, y, entryArea) || isPointInsideArea(x, y, exitArea)) {
+        setHoverCursor('move');
+        return;
+      }
+      setHoverCursor('default');
+      return;
+    }
+
+    // If not actively resizing/moving, nothing to do
+    if (!resizeInfo) return;
+
+    // Clamp values to 0-1000 range
+    const clampedX = Math.max(0, Math.min(1000, x));
+    const clampedY = Math.max(0, Math.min(1000, y));
+
+    const { handle, area, originalArea, mode, startX, startY } = resizeInfo;
+    const setArea = area === 'entry' ? setEntryArea : setExitArea;
+
+    // Handle moving the entire area
+    if (mode === 'move') {
+      const deltaX = clampedX - startX;
+      const deltaY = clampedY - startY;
+
+      let x1 = originalArea.x1 + deltaX;
+      let y1 = originalArea.y1 + deltaY;
+      let x2 = originalArea.x2 + deltaX;
+      let y2 = originalArea.y2 + deltaY;
+
+      // Keep area within bounds
+      const width = Math.abs(originalArea.x2 - originalArea.x1);
+      const height = Math.abs(originalArea.y2 - originalArea.y1);
+
+      if (x1 < 0) { x1 = 0; x2 = width; }
+      if (x2 > 1000) { x2 = 1000; x1 = 1000 - width; }
+      if (y1 < 0) { y1 = 0; y2 = height; }
+      if (y2 > 1000) { y2 = 1000; y1 = 1000 - height; }
+
+      setArea({ x1, y1, x2, y2 });
+      return;
+    }
+
+    // Handle resizing
+    // Get normalized coordinates (ensure x1 < x2, y1 < y2)
+    let x1 = Math.min(originalArea.x1, originalArea.x2);
+    let y1 = Math.min(originalArea.y1, originalArea.y2);
+    let x2 = Math.max(originalArea.x1, originalArea.x2);
+    let y2 = Math.max(originalArea.y1, originalArea.y2);
+
+    // Update coordinates based on which handle is being dragged
+    switch (handle) {
+      case 'top-left':
+        x1 = clampedX;
+        y1 = clampedY;
+        break;
+      case 'top-right':
+        x2 = clampedX;
+        y1 = clampedY;
+        break;
+      case 'bottom-left':
+        x1 = clampedX;
+        y2 = clampedY;
+        break;
+      case 'bottom-right':
+        x2 = clampedX;
+        y2 = clampedY;
+        break;
+      case 'top':
+        y1 = clampedY;
+        break;
+      case 'bottom':
+        y2 = clampedY;
+        break;
+      case 'left':
+        x1 = clampedX;
+        break;
+      case 'right':
+        x2 = clampedX;
+        break;
+    }
+
+    setArea({ x1, y1, x2, y2 });
   };
 
   const handleCanvasMouseUp = (e) => {
-    if (!drawingMode || !drawStart) return;
-
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 1000;
-    const y = ((e.clientY - rect.top) / rect.height) * 1000;
-
-    const area = {
-      x1: drawStart.x,
-      y1: drawStart.y,
-      x2: x,
-      y2: y,
-    };
-
-    if (drawingMode === 'entry') {
-      setEntryArea(area);
-    } else if (drawingMode === 'exit') {
-      setExitArea(area);
+    // If we were resizing, just stop
+    if (resizeInfo) {
+      setResizeInfo(null);
+      return;
     }
 
-    setDrawingMode(null);
-    setDrawStart(null);
+    // If we were drawing, complete the area
+    if (drawingMode && drawStart) {
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 1000;
+      const y = ((e.clientY - rect.top) / rect.height) * 1000;
+
+      const area = {
+        x1: drawStart.x,
+        y1: drawStart.y,
+        x2: x,
+        y2: y,
+      };
+
+      if (drawingMode === 'entry') {
+        setEntryArea(area);
+      } else if (drawingMode === 'exit') {
+        setExitArea(area);
+      }
+
+      setDrawingMode(null);
+      setDrawStart(null);
+    }
   };
 
   // Handle canvas click to close video (only when overlay is active)
   const handleCanvasClick = (e) => {
+    // Don't close video if we were resizing or drawing
+    if (resizeInfo || drawStart) return;
+
     // If video is playing and canvas is in overlay mode, close the video
     if (videoInfo) {
       setVideoInfo(null);
+      setVideoDimensions(null);
       setSelectedPath(null);
     }
   };
@@ -535,13 +782,13 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
             <div className="filter-group">
               <div className="area-button-wrapper">
                 <button
-                  className={`btn-area ${drawingMode === 'entry' ? 'active' : ''}`}
+                  className={`btn-area btn-entry ${drawingMode === 'entry' ? 'active' : ''} ${entryArea ? 'has-area' : ''}`}
                   onClick={() => setDrawingMode(drawingMode === 'entry' ? null : 'entry')}
                 >
                   {entryArea ? '✓ ' : ''}Entry Area
                 </button>
                 {entryArea && (
-                  <button className="btn-clear" onClick={() => setEntryArea(null)}>
+                  <button className="btn-clear btn-clear-entry" onClick={() => setEntryArea(null)}>
                     ✕
                   </button>
                 )}
@@ -551,13 +798,13 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
             <div className="filter-group">
               <div className="area-button-wrapper">
                 <button
-                  className={`btn-area ${drawingMode === 'exit' ? 'active' : ''}`}
+                  className={`btn-area btn-exit ${drawingMode === 'exit' ? 'active' : ''} ${exitArea ? 'has-area' : ''}`}
                   onClick={() => setDrawingMode(drawingMode === 'exit' ? null : 'exit')}
                 >
                   {exitArea ? '✓ ' : ''}Exit Area
                 </button>
                 {exitArea && (
-                  <button className="btn-clear" onClick={() => setExitArea(null)}>
+                  <button className="btn-clear btn-clear-exit" onClick={() => setExitArea(null)}>
                     ✕
                   </button>
                 )}
@@ -625,17 +872,28 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
                 }}
                 onClose={() => {
                   setVideoInfo(null);
+                  setVideoDimensions(null);
                   setSelectedPath(null);
                 }}
+                onVideoReady={(dims) => setVideoDimensions(dims)}
               />
             )}
             <canvas
               ref={canvasRef}
-              className={`forensic-canvas ${drawingMode ? 'drawing-mode' : ''} ${videoInfo ? 'overlay-canvas' : ''}`}
+              className={`forensic-canvas ${drawingMode ? 'drawing-mode' : ''} ${videoInfo ? 'overlay-canvas' : ''} ${resizeInfo ? 'resizing' : ''}`}
               onMouseDown={handleCanvasMouseDown}
+              onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
+              onMouseLeave={() => { resizeInfo && setResizeInfo(null); setHoverCursor('default'); }}
               onClick={handleCanvasClick}
-              style={{ display: imageLoaded || videoInfo ? 'block' : 'none' }}
+              style={{
+                display: imageLoaded || videoInfo ? 'block' : 'none',
+                ...(videoInfo && videoDimensions ? {
+                  width: videoDimensions.width + 'px',
+                  height: videoDimensions.height + 'px'
+                } : {}),
+                cursor: drawingMode ? 'crosshair' : (resizeInfo ? (resizeInfo.mode === 'move' ? 'move' : (resizeInfo.cursor || 'grabbing')) : hoverCursor)
+              }}
             />
           </div>
         )}
@@ -655,6 +913,7 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
               <tr>
                 <th>Time</th>
                 <th>Label</th>
+                <th>Color</th>
                 <th>Age (s)</th>
                 <th>Anomaly</th>
               </tr>
@@ -674,6 +933,7 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
                       {pathEvent.class}
                     </span>
                   </td>
+                  <td>{pathEvent.color1 || '-'}</td>
                   <td>{pathEvent.age?.toFixed(1) || 'N/A'}</td>
                   <td className="anomaly-cell">{pathEvent.anomaly || '-'}</td>
                 </tr>

@@ -152,7 +152,7 @@
 
 .btn-area {
   padding: 7px 12px;
-  border: 1px solid #ddd;
+  border: 2px solid #ddd;
   border-radius: 4px;
   background: white;
   font-size: 11px;
@@ -164,15 +164,81 @@
   flex-shrink: 0;
 }
 
-.btn-area:hover {
-  background: #f0f0f0;
-  border-color: #667eea;
+/* Entry Area Button - Green themed */
+.btn-entry {
+  border-color: #4CAF50;
+  color: #2E7D32;
 }
 
-.btn-area.active {
-  background: #667eea;
+.btn-entry:hover {
+  background: #E8F5E9;
+  border-color: #2E7D32;
+}
+
+.btn-entry.active {
+  background: #4CAF50;
   color: white;
-  border-color: #667eea;
+  border-color: #4CAF50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+}
+
+.btn-entry.has-area {
+  background: #C8E6C9;
+  color: #1B5E20;
+  border-color: #2E7D32;
+}
+
+.btn-entry.has-area:hover {
+  background: #A5D6A7;
+}
+
+/* Exit Area Button - Red themed */
+.btn-exit {
+  border-color: #F44336;
+  color: #C62828;
+}
+
+.btn-exit:hover {
+  background: #FFEBEE;
+  border-color: #C62828;
+}
+
+.btn-exit.active {
+  background: #F44336;
+  color: white;
+  border-color: #F44336;
+  box-shadow: 0 0 8px rgba(244, 67, 54, 0.5);
+}
+
+.btn-exit.has-area {
+  background: #FFCDD2;
+  color: #B71C1C;
+  border-color: #C62828;
+}
+
+.btn-exit.has-area:hover {
+  background: #EF9A9A;
+}
+
+/* Clear buttons specific styles */
+.btn-clear-entry {
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+.btn-clear-entry:hover {
+  background: #4CAF50;
+  color: white;
+}
+
+.btn-clear-exit {
+  border-color: #F44336;
+  color: #F44336;
+}
+
+.btn-clear-exit:hover {
+  background: #F44336;
+  color: white;
 }
 
 .btn-clear {
@@ -263,8 +329,8 @@
   border-radius: 8px;
   padding: 16px;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow: auto;
 }
@@ -279,6 +345,10 @@
 
 .forensic-canvas.drawing-mode {
   cursor: crosshair;
+}
+
+.forensic-canvas.resizing {
+  cursor: grabbing !important;
 }
 
 .loading {
@@ -330,9 +400,8 @@
 /* Canvas overlay - positioned on top of video (scoped to forensic search only) */
 .media-container .overlay-canvas {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
   pointer-events: auto; /* Allow clicking to close video */
   image-rendering: crisp-edges; /* Maintain sharp lines when scaled */
   cursor: pointer;
@@ -608,15 +677,81 @@
   color: #e0e0e0;
 }
 
-.dark-theme .btn-area:hover {
-  background: #2a2a2a;
-  border-color: #64b5f6;
+/* Dark theme Entry Area Button - Green themed */
+.dark-theme .btn-entry {
+  border-color: #66BB6A;
+  color: #81C784;
 }
 
-.dark-theme .btn-area.active {
-  background: #64b5f6;
+.dark-theme .btn-entry:hover {
+  background: #1B3B1F;
+  border-color: #81C784;
+}
+
+.dark-theme .btn-entry.active {
+  background: #4CAF50;
   color: #0f0f0f;
-  border-color: #64b5f6;
+  border-color: #4CAF50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+}
+
+.dark-theme .btn-entry.has-area {
+  background: #2E4C31;
+  color: #A5D6A7;
+  border-color: #66BB6A;
+}
+
+.dark-theme .btn-entry.has-area:hover {
+  background: #3A5F3E;
+}
+
+/* Dark theme Exit Area Button - Red themed */
+.dark-theme .btn-exit {
+  border-color: #EF5350;
+  color: #EF9A9A;
+}
+
+.dark-theme .btn-exit:hover {
+  background: #3D1F1F;
+  border-color: #EF9A9A;
+}
+
+.dark-theme .btn-exit.active {
+  background: #F44336;
+  color: #0f0f0f;
+  border-color: #F44336;
+  box-shadow: 0 0 8px rgba(244, 67, 54, 0.6);
+}
+
+.dark-theme .btn-exit.has-area {
+  background: #4C2B2B;
+  color: #FFCDD2;
+  border-color: #EF5350;
+}
+
+.dark-theme .btn-exit.has-area:hover {
+  background: #5F3636;
+}
+
+/* Dark theme Clear buttons */
+.dark-theme .btn-clear-entry {
+  border-color: #66BB6A;
+  color: #66BB6A;
+}
+
+.dark-theme .btn-clear-entry:hover {
+  background: #66BB6A;
+  color: #0f0f0f;
+}
+
+.dark-theme .btn-clear-exit {
+  border-color: #EF5350;
+  color: #EF5350;
+}
+
+.dark-theme .btn-clear-exit:hover {
+  background: #EF5350;
+  color: #0f0f0f;
 }
 
 .dark-theme .btn-clear {

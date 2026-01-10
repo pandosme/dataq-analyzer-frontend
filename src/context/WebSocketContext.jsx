@@ -19,7 +19,13 @@ export function WebSocketProvider({ children }) {
 
   // Convert http/https URL to ws/wss
   const getWebSocketUrl = useCallback((serverUrl, authToken) => {
-    if (!serverUrl || !authToken) return null;
+    if (!authToken) return null;
+
+    // Handle empty/relative URLs (for nginx proxy setup)
+    if (!serverUrl || serverUrl === '') {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      return `${wsProtocol}://${window.location.host}/ws/paths?token=${authToken}`;
+    }
 
     const wsProtocol = serverUrl.startsWith('https') ? 'wss' : 'ws';
     const urlWithoutProtocol = serverUrl.replace(/^https?:\/\//, '');

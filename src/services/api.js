@@ -5,9 +5,11 @@ let currentServerUrl = null;
 
 // Create axios instance with dynamic base URL
 const createApiInstance = (serverUrl) => {
-  const apiPath = serverUrl ? `${serverUrl}/api` : null;
+  // Support relative URLs (empty string or null) for nginx proxy
+  // When serverUrl is empty/null, use '/api' for same-origin requests
+  const apiPath = serverUrl === '' ? '/api' : (serverUrl ? `${serverUrl}/api` : null);
 
-  if (!apiPath) {
+  if (apiPath === null) {
     return null;
   }
 
