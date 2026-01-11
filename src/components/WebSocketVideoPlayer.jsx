@@ -71,6 +71,22 @@ function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onErr
         // Start processing any chunks that arrived before MediaSource was ready
         processChunkQueue();
 
+        // Auto-play when video has enough data
+        if (videoRef.current) {
+          const tryPlay = () => {
+            if (videoRef.current) {
+              videoRef.current.play().catch(e => {
+                if (import.meta.env.DEV) {
+                  console.log('WebSocketVideoPlayer: Autoplay blocked:', e.message);
+                }
+              });
+            }
+          };
+
+          // Try to play when we have enough data
+          videoRef.current.addEventListener('canplay', tryPlay, { once: true });
+        }
+
         setLoading(false);
       } catch (e) {
         console.error('Failed to create SourceBuffer:', e);
@@ -252,7 +268,12 @@ function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onErr
         const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
         wsUrl = `${wsProtocol}://${window.location.host}/ws/video?token=${token}`;
       } else {
-        wsUrl = server.url.replace(/^http/, 'ws') + `/ws/video?token=${token}`;
+        // Normalize URL to ensure it has a protocol before converting to WebSocket URL
+        let normalizedUrl = server.url;
+        if (!normalizedUrl.match(/^https?:\/\//i)) {
+          normalizedUrl = `http://${normalizedUrl}`;
+        }
+        wsUrl = normalizedUrl.replace(/^http/, 'ws') + `/ws/video?token=${token}`;
       }
 
       if (import.meta.env.DEV) {
@@ -484,6 +505,8 @@ function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onErr
         className="video-element"
         controls
         autoPlay
+        muted
+        playsInline
         style={{ display: loading ? 'none' : 'block' }}
       />
       {metadata && !loading && (

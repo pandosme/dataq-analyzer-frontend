@@ -3,11 +3,23 @@ import axios from 'axios';
 // Current server base URL (will be set dynamically)
 let currentServerUrl = null;
 
+// Helper to ensure URL has protocol
+const normalizeServerUrl = (url) => {
+  if (!url) return url;
+  // If URL doesn't start with http:// or https://, add http://
+  if (!url.match(/^https?:\/\//i)) {
+    return `http://${url}`;
+  }
+  return url;
+};
+
 // Create axios instance with dynamic base URL
 const createApiInstance = (serverUrl) => {
+  // Normalize URL to ensure protocol is present
+  const normalizedUrl = normalizeServerUrl(serverUrl);
   // Support relative URLs (empty string or null) for nginx proxy
   // When serverUrl is empty/null, use '/api' for same-origin requests
-  const apiPath = serverUrl === '' ? '/api' : (serverUrl ? `${serverUrl}/api` : null);
+  const apiPath = serverUrl === '' ? '/api' : (normalizedUrl ? `${normalizedUrl}/api` : null);
 
   if (apiPath === null) {
     return null;
@@ -219,14 +231,16 @@ export const pathsAPI = {
 // Authentication API
 export const authAPI = {
   // Login (accepts server URL since server is selected during login)
+  // Uses /auth/client-login endpoint which returns JWT token
   login: async (credentials, serverUrl) => {
+    const normalizedUrl = normalizeServerUrl(serverUrl);
     const loginApi = axios.create({
-      baseURL: `${serverUrl}/api`,
+      baseURL: `${normalizedUrl}/api`,
       headers: {
         'Content-Type': 'application/json',
       },
     });
-    const response = await loginApi.post('/auth/login', credentials);
+    const response = await loginApi.post('/auth/client-login', credentials);
     return response.data;
   },
 
