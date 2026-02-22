@@ -15,10 +15,10 @@ export const ServerProvider = ({ children }) => {
   const [servers, setServers] = useState([]);
   const [currentServer, setCurrentServer] = useState(null);
 
-  // Default local server (uses nginx proxy - empty URL means same-origin)
+  // Default local server (dev only - Vite proxy forwards to dart.internal)
   const defaultLocalServer = {
     id: 'local',
-    name: 'Local',
+    name: 'Local (dev)',
     url: '',
     isDefault: true,
   };

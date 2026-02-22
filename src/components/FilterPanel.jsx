@@ -23,7 +23,7 @@ function FilterPanel({ onFilterChange }) {
     from: format(new Date(Date.now() - 24 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
     to: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     class: '',
-    minDwell: '5',
+    minIdle: '5',
     limit: '500',
   });
 
@@ -51,7 +51,7 @@ function FilterPanel({ onFilterChange }) {
       from: filters.from ? new Date(filters.from).toISOString() : undefined,
       to: filters.to ? new Date(filters.to).toISOString() : undefined,
       class: filters.class || undefined,
-      minDwell: filters.minDwell ? parseFloat(filters.minDwell) : undefined,
+      minIdle: filters.minIdle ? parseFloat(filters.minIdle) : undefined,
       limit: filters.limit ? parseInt(filters.limit) : 500,
     };
     onFilterChange(apiFilters);
@@ -64,14 +64,14 @@ function FilterPanel({ onFilterChange }) {
       from: format(new Date(Date.now() - 24 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
       to: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       class: '',
-      minDwell: '5',
+      minIdle: '5',
       limit: '500',
     };
     setFilters(defaultFilters);
     onFilterChange({
       from: new Date(defaultFilters.from).toISOString(),
       to: new Date(defaultFilters.to).toISOString(),
-      minDwell: 5,
+      minIdle: 5,
       limit: 500,
     });
   };
@@ -139,17 +139,17 @@ function FilterPanel({ onFilterChange }) {
         </>
       )}
 
-      {/* Min Dwell Filter */}
+      {/* Min Idle Filter */}
       <div className="filter-group">
-        <label htmlFor="filter-min-dwell">Min Dwell Time (seconds):</label>
+        <label htmlFor="filter-min-idle">Min Idle Time (seconds):</label>
         <input
-          id="filter-min-dwell"
+          id="filter-min-idle"
           type="number"
-          value={filters.minDwell}
-          onChange={(e) => handleChange('minDwell', e.target.value)}
+          value={filters.minIdle}
+          onChange={(e) => handleChange('minIdle', e.target.value)}
           placeholder="5"
           min="0"
-          step="0.1"
+          step="1"
         />
       </div>
 

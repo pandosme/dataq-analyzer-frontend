@@ -1,118 +1,51 @@
-# DataQ Analyzer Frontend Deployment
+# DataQ Analyzer Frontend — Deployment
 
 ## Quick Start
 
-1. Download the deployment files to your server:
-   ```bash
-   curl -O https://raw.githubusercontent.com/pandosme/dataq-frontend/main/deploy/docker-compose.yml
-   curl -O https://raw.githubusercontent.com/pandosme/dataq-frontend/main/deploy/setup.sh
-   chmod +x setup.sh
-   ```
+```bash
+docker pull pandosme/dataq-frontend:latest
+docker run -d --name dataq-frontend -p 3303:80 --restart unless-stopped pandosme/dataq-frontend:latest
+```
 
-2. Run the setup script:
-   ```bash
-   ./setup.sh
-   ```
+Or with docker-compose:
 
-3. Follow the prompts to configure:
-   - Frontend port (default: 8303)
-   - Backend URL (e.g., `http://192.168.1.100:3303`)
+```bash
+curl -O https://raw.githubusercontent.com/pandosme/dataq-analyzer-frontend/main/deploy/docker-compose.yml
+docker compose up -d
+```
 
-## Manual Setup
+Open `http://<your-server>:3303`, select a backend server, and log in.
 
-If you prefer manual configuration:
+## How It Works
 
-1. Create a `.env` file:
-   ```bash
-   FRONTEND_PORT=8303
-   BACKEND_URL=http://your-backend-server:3303
-   ```
-
-2. Pull and start the container:
-   ```bash
-   docker compose pull
-   docker compose up -d
-   ```
-
-## Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FRONTEND_PORT` | 8303 | Port the frontend web interface listens on |
-| `BACKEND_URL` | http://host.docker.internal:3303 | URL of the DataQ backend API |
+The frontend is a static React SPA served by nginx. On the login screen, users select which DataQ backend to connect to. All API and WebSocket traffic goes directly from the browser to the chosen backend — no server-side proxy is needed.
 
 ## Common Commands
 
 ```bash
+# Start
+docker compose up -d
+
 # View logs
 docker compose logs -f
 
-# Stop the service
+# Stop
 docker compose down
 
-# Start the service
-docker compose up -d
-
-# Update to latest version
-docker compose pull
-docker compose up -d
-
-# Restart the service
-docker compose restart
-```
-
-## Network Configuration
-
-### Backend on Same Host
-
-If the backend is running on the same host (not in Docker):
-```bash
-BACKEND_URL=http://host.docker.internal:3303
-```
-
-### Backend on Different Server
-
-If the backend is on a different server:
-```bash
-BACKEND_URL=http://192.168.1.100:3303
-```
-
-### Backend in Docker (Same Host)
-
-If the backend is also running in Docker on the same host, you can use Docker networking:
-
-```yaml
-# docker-compose.yml
-services:
-  dataq-frontend:
-    image: pandosme/dataq-frontend:latest
-    ports:
-      - "8303:80"
-    environment:
-      - BACKEND_URL=http://dataq-backend:3303
-    networks:
-      - dataq-network
-
-networks:
-  dataq-network:
-    external: true
+# Update
+docker compose pull && docker compose up -d
 ```
 
 ## Troubleshooting
 
 ### Cannot connect to backend
 
-1. Verify the backend URL is correct
-2. Check if the backend is running: `curl http://your-backend:3303/api/health`
-3. Ensure firewall allows connections to the backend port
+1. Ensure the backend is reachable from the browser (not just the Docker host)
+2. Check if the backend is running: `curl http://<backend-host>:3303/api/health`
+3. Ensure CORS and firewall allow connections from the browser
 
 ### Container won't start
 
-Check the logs:
 ```bash
 docker compose logs dataq-frontend
 ```
-
-### WebSocket connection failed
-
-Ensure the backend URL includes the correct protocol and port. WebSocket connections are proxied through nginx automatically.

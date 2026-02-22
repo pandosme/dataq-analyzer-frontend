@@ -12,7 +12,7 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build for production (no API URL needed - uses nginx proxy)
+# Build for production (backend URL configured at runtime via login screen)
 RUN npm run build
 
 # ============================================
@@ -20,21 +20,49 @@ RUN npm run build
 # ============================================
 FROM nginx:alpine
 
-# Install envsubst (part of gettext)
-RUN apk add --no-cache gettext
-
-# Copy nginx config template
-COPY docker/nginx.conf.template /etc/nginx/conf.d/default.conf.template
-
-# Copy entrypoint script
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
 # Copy built app from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Expose port 80
-EXPOSE 80
+# Nginx config: SPA routing, gzip, caching
+RUN cat > /etc/nginx/conf.d/default.conf <<'EOF'
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
 
-# Use entrypoint script to configure nginx at runtime
-ENTRYPOINT ["/entrypoint.sh"]
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript
+               application/x-javascript application/xml+rss
+               application/javascript application/json;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires 0;
+    }
+
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+}
+EOF
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

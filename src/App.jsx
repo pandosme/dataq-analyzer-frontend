@@ -8,6 +8,7 @@ import LiveData from './components/LiveData';
 import ThreeColumnLayout from './components/ThreeColumnLayout';
 import Login from './components/Login';
 import UserSettings from './components/UserSettings';
+import Counters from './components/Counters';
 import { pathsAPI, camerasAPI } from './services/api';
 import { useAuth } from './context/AuthContext';
 import { useWebSocket } from './context/WebSocketContext';
@@ -18,7 +19,7 @@ const APPLICATIONS = [
   { id: 'flow-heatmap', name: 'Flow Heatmap', icon: '🔥' },
   { id: 'dwell-heatmap', name: 'Dwell Heatmap', icon: '⏱️' },
   { id: 'forensic-search', name: 'Forensic Search', icon: '🔍' },
-  { id: 'counters', name: 'Counters', icon: '🔢', disabled: true },
+  { id: 'counters', name: 'Counters', icon: '🔢' },
 ];
 
 function App() {
@@ -169,9 +170,10 @@ function App() {
     setError(null);
   };
 
-  // Use base64 snapshot if available
-  const backgroundImage = cameraDetails?.snapshot?.image
-    ? `data:image/jpeg;base64,${cameraDetails.snapshot.image}`
+  // Use base64 snapshot if available — backend may use 'image' or 'base64Image'
+  const rawSnap = cameraDetails?.snapshot?.image ?? cameraDetails?.snapshot?.base64Image ?? null;
+  const backgroundImage = rawSnap
+    ? (rawSnap.startsWith('data:') ? rawSnap : `data:image/jpeg;base64,${rawSnap}`)
     : '/images/camera-placeholder.jpg';
 
   if (import.meta.env.DEV && (selectedApplication === 'flow-heatmap' || selectedApplication === 'dwell-heatmap')) {
@@ -190,8 +192,12 @@ function App() {
 
   const currentApp = APPLICATIONS.find((app) => app.id === selectedApplication);
 
-  // Flow Heatmap three-column layout
-  const renderFlowHeatmap = () => {
+  // Shared three-column layout for Flow and Dwell heatmaps
+  const renderHeatmap = (appId) => {
+    const isFlow = appId === 'flow-heatmap';
+    const statKey = isFlow ? 'avgAge' : 'avgDwell';
+    const statLabel = isFlow ? 'Avg Age' : 'Avg Dwell';
+
     const leftPanel = (
       <div className="left-panel-content">
         <div className="panel-section">
@@ -207,14 +213,12 @@ function App() {
 
     const middlePanel = !selectedCamera ? (
       <div className="no-camera-selected">
-        <p>Select a camera to view flow heatmap data</p>
+        <p>Select a camera to view {isFlow ? 'flow' : 'dwell'} heatmap data</p>
       </div>
+    ) : isFlow ? (
+      <FlowHeatmap pathData={pathData} backgroundImage={backgroundImage} loading={loading} />
     ) : (
-      <FlowHeatmap
-        pathData={pathData}
-        backgroundImage={backgroundImage}
-        loading={loading}
-      />
+      <DwellHeatmap pathData={pathData} backgroundImage={backgroundImage} loading={loading} />
     );
 
     const rightPanel = (
@@ -235,7 +239,7 @@ function App() {
                   </strong>
                   <ul>
                     <li>Count: {stat.count}</li>
-                    <li>Avg Age: {stat.avgAge?.toFixed(1)}s</li>
+                    <li>{statLabel}: {stat[statKey]?.toFixed(1)}s</li>
                   </ul>
                 </div>
               ))}
@@ -246,76 +250,7 @@ function App() {
     );
 
     return (
-      <ThreeColumnLayout
-        leftPanel={leftPanel}
-        middlePanel={middlePanel}
-        rightPanel={rightPanel}
-      />
-    );
-  };
-
-  // Dwell Heatmap three-column layout
-  const renderDwellHeatmap = () => {
-    const leftPanel = (
-      <div className="left-panel-content">
-        <div className="panel-section">
-          <h3>Camera</h3>
-          <CameraSelector selectedCamera={selectedCamera} onCameraChange={handleCameraChange} />
-        </div>
-        <div className="panel-section">
-          <h3>Filters</h3>
-          <FilterPanel onFilterChange={handleFilterChange} />
-        </div>
-      </div>
-    );
-
-    const middlePanel = !selectedCamera ? (
-      <div className="no-camera-selected">
-        <p>Select a camera to view dwell heatmap data</p>
-      </div>
-    ) : (
-      <DwellHeatmap
-        pathData={pathData}
-        backgroundImage={backgroundImage}
-        minDwell={filters.minDwell || 5}
-        loading={loading}
-      />
-    );
-
-    const rightPanel = (
-      <div className="right-panel-content">
-        <div className="panel-section">
-          <h3>Statistics</h3>
-          {loading && <p className="loading-text">Loading...</p>}
-          {error && <div className="error-message">{error}</div>}
-          {!loading && !error && selectedCamera && (
-            <p className="result-count">{pathData.length} paths loaded</p>
-          )}
-          {stats && stats.length > 0 && (
-            <div className="stats-list">
-              {stats.map((stat) => (
-                <div key={stat._id} className="stat-item">
-                  <strong className={`stat-class stat-class-${stat._id?.toLowerCase() || 'unknown'}`}>
-                    {stat._id}:
-                  </strong>
-                  <ul>
-                    <li>Count: {stat.count}</li>
-                    <li>Avg Dwell: {stat.avgDwell?.toFixed(1)}s</li>
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-
-    return (
-      <ThreeColumnLayout
-        leftPanel={leftPanel}
-        middlePanel={middlePanel}
-        rightPanel={rightPanel}
-      />
+      <ThreeColumnLayout leftPanel={leftPanel} middlePanel={middlePanel} rightPanel={rightPanel} />
     );
   };
 
@@ -388,9 +323,9 @@ function App() {
           />
         )}
 
-        {selectedApplication === 'flow-heatmap' && renderFlowHeatmap()}
+        {selectedApplication === 'flow-heatmap' && renderHeatmap('flow-heatmap')}
 
-        {selectedApplication === 'dwell-heatmap' && renderDwellHeatmap()}
+        {selectedApplication === 'dwell-heatmap' && renderHeatmap('dwell-heatmap')}
 
         {selectedApplication === 'forensic-search' && (
           <ForensicSearch
@@ -403,12 +338,7 @@ function App() {
           />
         )}
 
-        {['counters'].includes(selectedApplication) && (
-          <div className="empty-state">
-            <h2>{currentApp?.name}</h2>
-            <p>Coming soon...</p>
-          </div>
-        )}
+        {selectedApplication === 'counters' && <Counters />}
       </main>
 
       {showSettings && <UserSettings onClose={() => setShowSettings(false)} />}

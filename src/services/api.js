@@ -147,9 +147,14 @@ export const pathsAPI = {
       mongoQuery.class = filters.class;
     }
 
-    // OPTIONAL: minDwell (dwell >= minDwell)
+    // OPTIONAL: minDwell (dwell >= minDwell) — kept for backward compat
     if (filters.minDwell !== undefined && filters.minDwell !== null && filters.minDwell !== '') {
       mongoQuery.dwell = { $gte: parseFloat(filters.minDwell) };
+    }
+
+    // OPTIONAL: minIdle (maxIdle >= minIdle) — filters paths where object was stationary
+    if (filters.minIdle !== undefined && filters.minIdle !== null && filters.minIdle !== '') {
+      mongoQuery.maxIdle = { $gte: parseFloat(filters.minIdle) };
     }
 
     // OPTIONAL: minAge (age >= minAge)
@@ -331,6 +336,100 @@ export const playbackAPI = {
     }
 
     return null;
+  },
+};
+
+// Counter Sets API
+// Transforms backend field names (total/byClass/mqttTopic/mqttInterval)
+// to frontend field names (value/classes/mqtt.topic/mqtt.intervalSeconds)
+const _toFrontendCounterSet = (cs) => {
+  if (!cs) return null;
+  const resetAt = cs.resetAt || null;
+  const counters = (cs.counters || []).map(c => ({
+    id:        c.id,
+    from:      c.from,
+    to:        c.to,
+    name:      c.name || '',
+    enabled:   c.enabled !== false,
+    value:     c.total ?? c.value ?? 0,
+    classes:   c.byClass instanceof Map ? Object.fromEntries(c.byClass) : (c.byClass || c.classes || {}),
+    lastReset: c.lastReset || resetAt || null,
+  }));
+  return {
+    _id:           cs._id,
+    name:          cs.name,
+    serial:        cs.serial,
+    objectClasses: cs.objectClasses || [],
+    zones:         cs.zones || [],
+    counters,
+    mqtt: {
+      enabled:         !!(cs.mqttTopic),
+      topic:           cs.mqttTopic || '',
+      intervalSeconds: cs.mqttInterval ?? 60,
+    },
+    days:      cs.days ?? 0,
+    backfill:  cs.backfill || null,
+    resetAt,
+    createdAt: cs.createdAt,
+    updatedAt: cs.updatedAt,
+  };
+};
+
+const _toBackendBody = (body) => {
+  const out = { ...body };
+  if (body.mqtt) {
+    // If enabled is explicitly false, clear the topic so MQTT stops
+    out.mqttTopic    = body.mqtt.enabled ? (body.mqtt.topic || '') : '';
+    out.mqttInterval = body.mqtt.intervalSeconds ?? 60;
+    delete out.mqtt;
+  }
+  return out;
+};
+
+export const countersAPI = {
+  list: async () => {
+    const response = await getApi().get('/counters');
+    return (response.data.data || []).map(_toFrontendCounterSet);
+  },
+
+  get: async (id) => {
+    const response = await getApi().get(`/counters/${id}`);
+    return _toFrontendCounterSet(response.data.data);
+  },
+
+  create: async (body) => {
+    const response = await getApi().post('/counters', _toBackendBody(body));
+    return _toFrontendCounterSet(response.data.data);
+  },
+
+  update: async (id, body) => {
+    const response = await getApi().put(`/counters/${id}`, _toBackendBody(body));
+    return _toFrontendCounterSet(response.data.data);
+  },
+
+  delete: async (id) => {
+    await getApi().delete(`/counters/${id}`);
+  },
+
+  resetAll: async (id) => {
+    const response = await getApi().post(`/counters/${id}/reset`);
+    return _toFrontendCounterSet(response.data.data);
+  },
+
+  resetOne: async (id, counterId) => {
+    const encoded = encodeURIComponent(counterId);
+    const response = await getApi().post(`/counters/${id}/counters/${encoded}/reset`);
+    return _toFrontendCounterSet(response.data.data);
+  },
+
+  getBackfill: async (id) => {
+    const response = await getApi().get(`/counters/${id}/backfill`);
+    return response.data.data;
+  },
+
+  startBackfill: async (id) => {
+    const response = await getApi().post(`/counters/${id}/backfill`);
+    return response.data.data;
   },
 };
 

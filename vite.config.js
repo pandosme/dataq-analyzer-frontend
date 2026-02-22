@@ -4,10 +4,22 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/',  // Root path for user frontend
+  base: '/',
   server: {
-    host: '0.0.0.0',  // Listen on all network interfaces
-    port: 3303,
+    host: '0.0.0.0',
+    port: 3403,
+    proxy: {
+      // Proxy API and WebSocket requests to the dev backend (mirrors Docker/nginx behaviour)
+      '/api': {
+        target: 'http://dart.internal:3303',
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: 'ws://dart.internal:3303',
+        ws: true,
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',

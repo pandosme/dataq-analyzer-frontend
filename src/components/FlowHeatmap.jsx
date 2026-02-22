@@ -158,16 +158,14 @@ function FlowHeatmap({ pathData, backgroundImage, loading }) {
         </div>
       </div>
 
-      {!imageLoaded && <div className="loading">Loading camera view...</div>}
-      <canvas
-        ref={canvasRef}
-        style={{
-          display: imageLoaded ? 'block' : 'none',
-          maxWidth: '100%',
-          height: 'auto',
-          border: '1px solid #ddd',
-        }}
-      />
+      <div className="canvas-container">
+        {!imageLoaded && <div className="loading">Loading camera view...</div>}
+        <canvas
+          ref={canvasRef}
+          className="heatmap-canvas"
+          style={{ display: imageLoaded ? 'block' : 'none' }}
+        />
+      </div>
     </div>
   );
 }
