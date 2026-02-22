@@ -412,6 +412,14 @@
   font-size: 0.82rem;
 }
 
+/* ─── Path overlay toggle ──────────────────────────────────────────────────── */
+.path-toggle {
+  display: flex; align-items: center; gap: 6px;
+  color: #b0b0c0; font-size: 0.85rem; cursor: pointer;
+  margin-top: 8px; user-select: none;
+}
+.path-toggle input[type="checkbox"] { accent-color: #5b9bd5; cursor: pointer; }
+
 /* ─── Step 2: Name & Classes ───────────────────────────────────────────────── */
 .step2-layout { display: flex; flex-direction: column; gap: 20px; max-width: 540px; }
 

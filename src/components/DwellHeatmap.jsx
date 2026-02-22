@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import './DwellHeatmap.css';
 
 // Grid resolution for heat accumulation (independent of canvas size)
@@ -68,7 +68,6 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
   const [opacity, setOpacity]         = useState(0.75);
   const [minPointDwell, setMinPointDwell] = useState(0.5);
   const [mode, setMode]               = useState('points'); // 'points' | 'peak'
-  const [showDiag, setShowDiag]       = useState(false);
   const imageRef = useRef(null);
 
   // AOI: always exists, defaults to full image
@@ -80,61 +79,6 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
   const isFullImage = useCallback((a) => {
     return a.x1 <= 0.001 && a.y1 <= 0.001 && a.x2 >= 0.999 && a.y2 >= 0.999;
   }, []);
-
-  // --- Diagnostics: analyse raw path data from backend ---
-  const diag = useMemo(() => {
-    if (!pathData || pathData.length === 0) return null;
-
-    let totalPoints = 0;
-    let pointsWithD = 0;
-    let minD = Infinity, maxD = 0, sumD = 0;
-    let maxIdleValues = [];
-    let dwellValues = [];
-    let pointsAboveThreshold = 0;
-    let pointsInAOI = 0;
-
-    pathData.forEach((event) => {
-      if (event.maxIdle !== undefined) maxIdleValues.push(event.maxIdle);
-      if (event.dwell !== undefined) dwellValues.push(event.dwell);
-
-      const points = event.path ? event.path.slice(0, -1) : [];
-      points.forEach((pt) => {
-        totalPoints++;
-        if (pt.d !== undefined && pt.d !== null) {
-          pointsWithD++;
-          sumD += pt.d;
-          if (pt.d < minD) minD = pt.d;
-          if (pt.d > maxD) maxD = pt.d;
-          if (pt.d >= minPointDwell) {
-            pointsAboveThreshold++;
-            if (insideAOI(pt.x / 1000, pt.y / 1000, aoi)) pointsInAOI++;
-          }
-        }
-      });
-    });
-
-    const avgMaxIdle = maxIdleValues.length
-      ? (maxIdleValues.reduce((a, b) => a + b, 0) / maxIdleValues.length).toFixed(1)
-      : 'n/a';
-    const maxMaxIdle = maxIdleValues.length ? Math.max(...maxIdleValues).toFixed(1) : 'n/a';
-    const avgDwell = dwellValues.length
-      ? (dwellValues.reduce((a, b) => a + b, 0) / dwellValues.length).toFixed(1)
-      : 'n/a';
-
-    return {
-      paths: pathData.length,
-      totalPoints,
-      pointsWithD,
-      minD: pointsWithD ? minD.toFixed(2) : 'n/a',
-      maxD: pointsWithD ? maxD.toFixed(2) : 'n/a',
-      avgD: pointsWithD ? (sumD / pointsWithD).toFixed(2) : 'n/a',
-      pointsAboveThreshold,
-      pointsInAOI,
-      avgMaxIdle,
-      maxMaxIdle,
-      avgDwell,
-    };
-  }, [pathData, minPointDwell, aoi]);
 
   // Load background image
   useEffect(() => {
@@ -423,12 +367,12 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
             <button
               className={mode === 'points' ? 'active' : ''}
               onClick={() => setMode('points')}
-              title="Plot every path point weighted by time spent there"
+              title="Uses every point along each tracked path. Each point is weighted by how long the object paused there. Gives a detailed, granular heatmap."
             >Path Points</button>
             <button
               className={mode === 'peak' ? 'active' : ''}
               onClick={() => setMode('peak')}
-              title="Plot each path at its birth position weighted by longest idle (maxIdle) — best for stopped vehicles"
+              title="Uses only the single location per path where the object was stationary the longest. Best for identifying queuing spots and waiting areas."
             >Peak Idle</button>
           </div>
         </div>
@@ -438,6 +382,7 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
             type="range" min="0.1" max="120" step="0.1"
             value={minPointDwell}
             onChange={(e) => setMinPointDwell(parseFloat(e.target.value))}
+            title="Only include points where the object was idle for at least this many seconds. Increase to focus on longer stops, decrease to include brief pauses."
           />
         </div>
         <div className="control-group">
@@ -446,69 +391,29 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
             type="range" min="0.1" max="1" step="0.05"
             value={opacity}
             onChange={(e) => setOpacity(parseFloat(e.target.value))}
+            title="Controls the opacity of the heatmap overlay on top of the camera image. Lower values make the background more visible."
           />
         </div>
         <div className="control-group aoi-controls">
-          <label>Area of Interest</label>
+          <label title="Limit the heatmap to a specific area. Useful for excluding zones with known high idle times (e.g. parked vehicles, waiting areas) so you can focus on the area you want to analyze.">Area of Interest</label>
           <div className="aoi-buttons">
             {!aoiEditing ? (
-              <button className="btn-small btn-secondary" onClick={enterEdit} title="Edit AOI region">
+              <button className="btn-small btn-secondary" onClick={enterEdit} title="Draw a rectangle to focus the heatmap on a specific area, excluding surrounding zones with high idle times that may dominate the visualization.">
                 AOI
               </button>
             ) : (
-              <button className="btn-small btn-aoi-save" onClick={saveAoi} title="Apply AOI and redraw heatmap">
+              <button className="btn-small btn-aoi-save" onClick={saveAoi} title="Apply the selected area and redraw the heatmap using only data within this region.">
                 Save AOI
               </button>
             )}
             {!isFullImage(aoi) && !aoiEditing && (
-              <button className="btn-small btn-secondary" onClick={resetAoi} title="Reset AOI to full image">
+              <button className="btn-small btn-secondary" onClick={resetAoi} title="Remove the area filter and show the heatmap for the entire camera view.">
                 Reset
               </button>
             )}
           </div>
         </div>
-        <button
-          className="diag-toggle-btn"
-          onClick={() => setShowDiag(v => !v)}
-          title="Show data diagnostics"
-        >
-          {showDiag ? 'Hide Diagnostics' : 'Diagnostics'}
-        </button>
       </div>
-
-      {/* Diagnostics panel */}
-      {showDiag && (
-        <div className="diag-panel">
-          {!diag ? (
-            <span className="diag-empty">No data loaded yet</span>
-          ) : (
-            <table className="diag-table">
-              <tbody>
-                <tr><td>Paths received</td><td><strong>{diag.paths}</strong></td></tr>
-                <tr><td>Total path points (excl. last)</td><td><strong>{diag.totalPoints}</strong></td></tr>
-                <tr><td>Points with a <code>d</code> value</td><td><strong>{diag.pointsWithD}</strong>
-                  {diag.pointsWithD === 0 && <span className="diag-warn"> ⚠ path points have no idle time — DataQ may not be recording it</span>}
-                </td></tr>
-                <tr><td>Min / Avg / Max point <code>d</code></td><td><strong>{diag.minD} / {diag.avgD} / {diag.maxD} s</strong></td></tr>
-                <tr><td>Points ≥ {minPointDwell}s (drawn)</td><td><strong>{diag.pointsAboveThreshold}</strong>
-                  {diag.pointsAboveThreshold === 0 && diag.pointsWithD > 0 &&
-                    <span className="diag-warn"> ⚠ lower &quot;Min Point Idle&quot; slider — all d values are below threshold</span>}
-                </td></tr>
-                {!isFullImage(aoi) && (
-                  <tr><td>Points in AOI</td><td><strong>{diag.pointsInAOI}</strong>
-                    {diag.pointsInAOI === 0 && diag.pointsAboveThreshold > 0 &&
-                      <span className="diag-warn"> ⚠ no qualifying points inside AOI — try a larger area</span>}
-                  </td></tr>
-                )}
-                <tr><td>Avg / Max path-level <code>maxIdle</code></td><td><strong>{diag.avgMaxIdle} / {diag.maxMaxIdle} s</strong>
-                  {diag.maxMaxIdle === 'n/a' && <span className="diag-warn"> ⚠ maxIdle not present in events</span>}
-                </td></tr>
-                <tr><td>Avg path-level <code>dwell</code></td><td><strong>{diag.avgDwell} s</strong></td></tr>
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
 
       {/* Colour legend */}
       <div className="dwell-legend">

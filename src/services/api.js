@@ -142,9 +142,9 @@ export const pathsAPI = {
       }
     }
 
-    // OPTIONAL: class (exact match, null/empty means all)
+    // OPTIONAL: class (exact match or array for $in, null/empty means all)
     if (filters.class) {
-      mongoQuery.class = filters.class;
+      mongoQuery.class = Array.isArray(filters.class) ? { $in: filters.class } : filters.class;
     }
 
     // OPTIONAL: minDwell (dwell >= minDwell) — kept for backward compat

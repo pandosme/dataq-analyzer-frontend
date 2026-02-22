@@ -604,9 +604,30 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
       return;
     }
 
-    // Call parent's onQuery with limit
+    // Build query from ForensicSearch's own filters
+    // This overrides any stale App-level filters from other views
+    const hours = getTimeRangeHours(filters.timeRange);
+    const now = new Date();
+    const from = new Date(now.getTime() - hours * 60 * 60 * 1000);
+
+    const queryFilters = {
+      from: from.toISOString(),
+      to: now.toISOString(),
+      limit: queryLimit,
+    };
+
+    // Only include class if explicitly selected (empty = all)
+    if (filters.class) {
+      queryFilters.class = filters.class;
+    }
+
+    // Include minAge if set
+    if (filters.minAge > 0) {
+      queryFilters.minAge = filters.minAge;
+    }
+
     if (onQuery) {
-      onQuery({ limit: queryLimit });
+      onQuery(queryFilters);
     }
   };
 

@@ -78,6 +78,10 @@ export const AuthProvider = ({ children }) => {
     return user?.role === 'admin';
   };
 
+  const isViewer = () => {
+    return user?.role === 'viewer';
+  };
+
   const isAuthorizedForCamera = (cameraId) => {
     if (!user) return false;
     if (user.role === 'admin') return true;
@@ -94,6 +98,7 @@ export const AuthProvider = ({ children }) => {
     updateUser,
     isAuthenticated: !!token && !!user && !!server,
     isAdmin,
+    isViewer,
     isAuthorizedForCamera,
   };
 

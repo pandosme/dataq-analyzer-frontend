@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import CameraSelector from './CameraSelector';
 import { camerasAPI, pathsAPI, countersAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import './Counters.css';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -287,7 +288,7 @@ function ZoneEditor({ snapshot, zones, paths, onChange }) {
 }
 
 // ─── Counter List ─────────────────────────────────────────────────────────────
-function CounterList({ sets, loading, onRefresh, onCreate, onSelect }) {
+function CounterList({ sets, loading, onRefresh, onCreate, onSelect, readOnly }) {
   return (
     <div className="counter-list">
       <div className="counter-list-header">
@@ -296,14 +297,14 @@ function CounterList({ sets, loading, onRefresh, onCreate, onSelect }) {
           <button className="btn-secondary" onClick={onRefresh} disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}
           </button>
-          <button className="btn-primary" onClick={onCreate}>+ New Counter Set</button>
+          {!readOnly && <button className="btn-primary" onClick={onCreate}>+ New Counter Set</button>}
         </div>
       </div>
 
       {!loading && sets.length === 0 && (
         <div className="empty-state">
           <p>No counter sets defined yet.</p>
-          <button className="btn-primary" onClick={onCreate}>Create your first Counter Set</button>
+          {!readOnly && <button className="btn-primary" onClick={onCreate}>Create your first Counter Set</button>}
         </div>
       )}
 
@@ -328,10 +329,24 @@ function CounterList({ sets, loading, onRefresh, onCreate, onSelect }) {
                 <td className="count-cell">{totalCount(s).toLocaleString()}</td>
                 <td>{s.days ?? 0}</td>
                 <td>
-                  <span className={`backfill-badge backfill-${s.backfill?.status || 'idle'}`}>
-                    {s.backfill?.status || 'idle'}
-                    {s.backfill?.status === 'running' && s.backfill.totalPaths > 0 &&
-                      ` ${Math.round(s.backfill.processedPaths / s.backfill.totalPaths * 100)}%`}
+                  <span className={`backfill-badge backfill-${s.backfill?.status || 'idle'}`}
+                    title={(!s.backfill?.status || s.backfill?.status === 'idle')
+                      ? 'No backfill — counter only counts new events.'
+                      : s.backfill?.status === 'running'
+                      ? 'Backfill in progress — counting historical path data.'
+                      : s.backfill?.status === 'complete'
+                      ? 'Backfill applied — historical data has been counted.'
+                      : s.backfill?.status === 'failed'
+                      ? `Backfill failed: ${s.backfill.error || 'unknown error'}`
+                      : ''}
+                  >
+                    {(!s.backfill?.status || s.backfill?.status === 'idle') && 'No backfill'}
+                    {s.backfill?.status === 'running' &&
+                      `Backfill${s.backfill.totalPaths > 0
+                        ? ` ${Math.round(s.backfill.processedPaths / s.backfill.totalPaths * 100)}%`
+                        : '...'}`}
+                    {s.backfill?.status === 'complete' && 'Backfill'}
+                    {s.backfill?.status === 'failed' && 'Backfill failed'}
                   </span>
                 </td>
               </tr>
@@ -344,7 +359,7 @@ function CounterList({ sets, loading, onRefresh, onCreate, onSelect }) {
 }
 
 // ─── Counter Detail (merged view + edit) ─────────────────────────────────────
-function CounterDetail({ set: initialSet, onBack, onChanged, onDelete }) {
+function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly }) {
   const [set, setSet]                     = useState(initialSet);
   const [name, setName]                   = useState(initialSet.name);
   const [zones, setZones]                 = useState(initialSet.zones.map(z => ({ ...z, rect: { ...z.rect } })));
@@ -354,6 +369,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete }) {
   const [mqttInterval, setMqttInterval]   = useState(initialSet.mqtt?.intervalSeconds || 60);
   const [snapshot, setSnapshot]           = useState(null);
   const [paths, setPaths]                 = useState([]);
+  const [showPaths, setShowPaths]         = useState(false);
   const [backfill, setBackfill]           = useState(initialSet.backfill);
   const [busy, setBusy]                   = useState(false);
   const [deleting, setDeleting]           = useState(false);
@@ -385,7 +401,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete }) {
   };
   const extractImage = (obj) => toDataUrl(obj?.image ?? obj?.base64Image ?? null);
 
-  // Load snapshot + recent paths
+  // Load snapshot
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -402,14 +418,23 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete }) {
           if (img) setSnapshot(img);
         }
       } catch {} // eslint-disable-line no-empty
-      try {
-        const now = Math.floor(Date.now() / 1000);
-        const res = await pathsAPI.query({ serial: set.serial, timestamp: { $gte: now - 3600 } }, { limit: 200, sort: { timestamp: -1 } });
-        if (!cancelled && res?.length) setPaths(res);
-      } catch {} // eslint-disable-line no-empty
     })();
     return () => { cancelled = true; };
   }, [set.serial]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load paths on demand when toggle is enabled
+  useEffect(() => {
+    if (!showPaths) { setPaths([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await pathsAPI.query({ serial: set.serial, class: objectClasses, limit: 500 });
+        const events = res?.data || res || [];
+        if (!cancelled && events.length) setPaths(events);
+      } catch {} // eslint-disable-line no-empty
+    })();
+    return () => { cancelled = true; };
+  }, [showPaths, set.serial, objectClasses]);
 
   // Initialize & regenerate counters when zones change
   useEffect(() => {
@@ -523,15 +548,15 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete }) {
     <div className="counter-detail">
       <div className="detail-header">
         <button className="btn-secondary btn-small" onClick={onBack}>← Back</button>
-        <h2><input className="name-input" value={name} onChange={e => setName(e.target.value)} /></h2>
+        <h2>{readOnly ? name : <input className="name-input" value={name} onChange={e => setName(e.target.value)} />}</h2>
         <div className="detail-actions">
-          {saved && <span className="saved-indicator">✓ Saved</span>}
-          <button className="btn-warning btn-small" onClick={handleReset} disabled={busy}>Reset Counters</button>
-          <button className="btn-info btn-small" onClick={handleBackfill} disabled={busy || backfill?.status === 'running'}>Backfill</button>
-          <button className={`btn-save${dirty ? ' btn-save-dirty' : ''}`} onClick={handleSave} disabled={busy || !dirty || zones.length < 2 || objectClasses.length === 0}>
+          {!readOnly && saved && <span className="saved-indicator">✓ Saved</span>}
+          {!readOnly && <button className="btn-warning btn-small" onClick={handleReset} disabled={busy}>Reset Counters</button>}
+          {!readOnly && <button className="btn-info btn-small" onClick={handleBackfill} disabled={busy || backfill?.status === 'running'}>Backfill</button>}
+          {!readOnly && <button className={`btn-save${dirty ? ' btn-save-dirty' : ''}`} onClick={handleSave} disabled={busy || !dirty || zones.length < 2 || objectClasses.length === 0}>
             {busy ? 'Saving…' : 'Save'}
-          </button>
-          <button className="btn-danger btn-small" onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
+          </button>}
+          {!readOnly && <button className="btn-danger btn-small" onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>}
         </div>
       </div>
 
@@ -559,12 +584,18 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete }) {
           {zones.map((z, i) => (
             <div key={z.label} className="zone-row">
               <span className="zone-chip-lg" style={{ background: ZONE_COLORS_FILL[i], borderColor: ZONE_COLORS_BORDER[i], color: ZONE_COLORS_BORDER[i] }}>{z.label}</span>
-              <input placeholder={`Zone ${z.label} name`} value={z.name}
+              <input placeholder={`Zone ${z.label} name`} value={z.name} readOnly={readOnly}
                 onChange={e => setZones(prev => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
-              <button className="btn-small btn-danger" onClick={() => removeZone(i)} disabled={zones.length <= 2}>✕</button>
+              {!readOnly && <button className="btn-small btn-danger" onClick={() => removeZone(i)} disabled={zones.length <= 2}>✕</button>}
             </div>
           ))}
-          {zones.length < 6 && <p className="hint">Draw on the image to add a zone.</p>}
+          {!readOnly && zones.length < 6 && <p className="hint">Draw on the image to add a zone.</p>}
+
+          {/* Path overlay toggle */}
+          <label className="path-toggle" title="Show the last 500 stored paths to help position zones. Yellow dot = start, line = direction of travel.">
+            <input type="checkbox" checked={showPaths} onChange={e => setShowPaths(e.target.checked)} />
+            {' '}Show paths
+          </label>
 
           {/* Object Classes */}
           <div className="detail-settings-group">
@@ -572,7 +603,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete }) {
             <div className="class-checkboxes">
               {ALL_CLASSES.map(cls => (
                 <label key={cls} className="class-check">
-                  <input type="checkbox" checked={objectClasses.includes(cls)}
+                  <input type="checkbox" checked={objectClasses.includes(cls)} disabled={readOnly}
                     onChange={e => setObjectClasses(prev => e.target.checked ? [...prev, cls] : prev.filter(c => c !== cls))} />
                   {' '}{cls}
                 </label>
@@ -731,6 +762,7 @@ function CounterCreate({ onSave, onCancel }) {
   const [camera, setCamera]           = useState('');
   const [snapshot, setSnapshot]       = useState(null);
   const [paths, setPaths]             = useState([]);
+  const [showPaths, setShowPaths]     = useState(false);
   const [loadingSnap, setLoadingSnap] = useState(false);
   const [zones, setZones]             = useState([]);
   const [setName, setSetName]         = useState('');
@@ -763,9 +795,7 @@ function CounterCreate({ onSave, onCancel }) {
       }),
       // Get camera list (as fallback for snapshot + for display name)
       camerasAPI.getAll().catch(() => null),
-      // Recent paths for zone-drawing overlay
-      pathsAPI.query({ serial: camera, limit: 500 }).catch(() => ({ data: [] })),
-    ]).then(([snapResp, camerasResp, pathsResp]) => {
+    ]).then(([snapResp, camerasResp]) => {
       // Try snapshot from dedicated endpoint first (data.image or data.base64Image)
       let img = extractImage(snapResp?.data);
 
@@ -776,10 +806,25 @@ function CounterCreate({ onSave, onCancel }) {
       }
 
       setSnapshot(img);
-      setPaths(pathsResp?.data || []);
       setLoadingSnap(false);
     });
   }, [camera]);
+
+  // Load paths on demand when toggle is enabled
+  useEffect(() => {
+    if (!showPaths || !camera) { setPaths([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const q = { serial: camera, limit: 500 };
+        if (objectClasses.length > 0) q.class = objectClasses;
+        const res = await pathsAPI.query(q);
+        const events = res?.data || res || [];
+        if (!cancelled) setPaths(events);
+      } catch {} // eslint-disable-line no-empty
+    })();
+    return () => { cancelled = true; };
+  }, [showPaths, camera, objectClasses]);
 
   // Regenerate pairs whenever zones change
   useEffect(() => {
@@ -837,7 +882,7 @@ function CounterCreate({ onSave, onCancel }) {
       {step === 1 && (
         <div className="wizard-step">
           <h3>Step 1 — Draw Zones</h3>
-          <p className="step-hint">Select a camera, then <strong>click and drag</strong> rectangles on the snapshot to define 2–6 zones. Yellow dots show recent object paths to guide placement.</p>
+          <p className="step-hint">Select a camera, then <strong>click and drag</strong> rectangles on the snapshot to define 2–6 zones. Toggle &quot;Show paths&quot; to see recent object paths and guide placement.</p>
           <div className="step1-layout">
             <div className="step1-sidebar">
               <label className="field-label">Camera</label>
@@ -859,6 +904,13 @@ function CounterCreate({ onSave, onCancel }) {
                   ))}
                   {zones.length >= 2 && <p className="hint">Generates {zones.length * (zones.length - 1)} counters</p>}
                 </div>
+              )}
+              {/* Path overlay toggle */}
+              {camera && (
+                <label className="path-toggle" title="Show the last 500 stored paths to help position zones. Yellow dot = start, line = direction of travel.">
+                  <input type="checkbox" checked={showPaths} onChange={e => setShowPaths(e.target.checked)} />
+                  {' '}Show paths
+                </label>
               )}
               {!snapshot && !loadingSnap && !camera && <p className="hint">Select a camera to begin.</p>}
               {!snapshot && !loadingSnap && camera && <p className="hint warning">⚠ Could not load snapshot — check browser console for details. You can still draw zones once the image loads.</p>}
@@ -975,6 +1027,8 @@ function CounterCreate({ onSave, onCancel }) {
 
 // ─── Main Counters Component ──────────────────────────────────────────────────
 export default function Counters() {
+  const { isViewer } = useAuth();
+  const viewer = isViewer();
   const [view, setView]     = useState('list'); // 'list' | 'create' | 'detail'
   const [sets, setSets]     = useState([]);
   const [selected, setSelected] = useState(null);
@@ -1006,9 +1060,9 @@ export default function Counters() {
     setView('detail');
   };
 
-  if (view === 'create') return <CounterCreate onSave={handleSaved} onCancel={() => setView('list')} />;
+  if (view === 'create' && !viewer) return <CounterCreate onSave={handleSaved} onCancel={() => setView('list')} />;
   if (view === 'detail' && selected) return (
-    <CounterDetail set={selected} onBack={() => setView('list')} onChanged={handleChanged} onDelete={handleDeleted} />
+    <CounterDetail set={selected} onBack={() => setView('list')} onChanged={handleChanged} onDelete={handleDeleted} readOnly={viewer} />
   );
 
   return (
@@ -1019,6 +1073,7 @@ export default function Counters() {
         onRefresh={loadList}
         onCreate={() => setView('create')}
         onSelect={s => { setSelected(s); setView('detail'); }}
+        readOnly={viewer}
       />
     </div>
   );

@@ -15,17 +15,17 @@ import { useWebSocket } from './context/WebSocketContext';
 import './App.css';
 
 const APPLICATIONS = [
-  { id: 'detections', name: 'Detections', icon: '📡' },
   { id: 'flow-heatmap', name: 'Flow Heatmap', icon: '🔥' },
   { id: 'dwell-heatmap', name: 'Dwell Heatmap', icon: '⏱️' },
   { id: 'forensic-search', name: 'Forensic Search', icon: '🔍' },
   { id: 'counters', name: 'Counters', icon: '🔢' },
+  { id: 'live-view', name: 'Live View', icon: '📡' },
 ];
 
 function App() {
   const { isAuthenticated, loading: authLoading, user, server, logout } = useAuth();
   const { isConnected: wsConnected } = useWebSocket();
-  const [selectedApplication, setSelectedApplication] = useState('detections');
+  const [selectedApplication, setSelectedApplication] = useState('flow-heatmap');
   const [selectedCamera, setSelectedCamera] = useState('');
   const [cameraDetails, setCameraDetails] = useState(null);
   const [filters, setFilters] = useState({});
@@ -315,7 +315,7 @@ function App() {
       </header>
 
       <main className="main-content">
-        {selectedApplication === 'detections' && (
+        {selectedApplication === 'live-view' && (
           <LiveData
             selectedCamera={selectedCamera}
             cameraDetails={cameraDetails}

@@ -33,10 +33,14 @@ function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
     });
   }, [cameraDetails]);
 
+  // Clear paths when camera changes
+  useEffect(() => {
+    setRecentPaths([]);
+  }, [selectedCamera]);
+
   // Subscribe to WebSocket for real-time path events
   useEffect(() => {
     if (!selectedCamera) {
-      setRecentPaths([]);
       return;
     }
 
@@ -252,7 +256,9 @@ function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
 
     const drawPathOverlays = () => {
       // DataQ coordinates are [0...1000][0...1000]
-      // Canvas is 1000x1000 pixels - direct mapping, CSS handles scaling
+      // Scale to canvas pixel dimensions
+      const scaleX = canvas.width / 1000;
+      const scaleY = canvas.height / 1000;
 
       recentPaths.forEach((pathEvent, index) => {
         const coordinates = pathEvent.path || [];
@@ -269,13 +275,15 @@ function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Draw path line using DataQ coordinates directly
+        // Draw path line, scaling DataQ coordinates to canvas pixels
         ctx.beginPath();
         coordinates.forEach((coord, i) => {
+          const x = coord.x * scaleX;
+          const y = coord.y * scaleY;
           if (i === 0) {
-            ctx.moveTo(coord.x, coord.y);
+            ctx.moveTo(x, y);
           } else {
-            ctx.lineTo(coord.x, coord.y);
+            ctx.lineTo(x, y);
           }
         });
         ctx.stroke();
@@ -284,14 +292,14 @@ function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
         const startCoord = coordinates[0];
         ctx.fillStyle = `rgba(0, 255, 0, ${opacity})`;
         ctx.beginPath();
-        ctx.arc(startCoord.x, startCoord.y, 5, 0, 2 * Math.PI);
+        ctx.arc(startCoord.x * scaleX, startCoord.y * scaleY, 5, 0, 2 * Math.PI);
         ctx.fill();
 
         // Draw end point (red circle)
         const endCoord = coordinates[coordinates.length - 1];
         ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
         ctx.beginPath();
-        ctx.arc(endCoord.x, endCoord.y, 5, 0, 2 * Math.PI);
+        ctx.arc(endCoord.x * scaleX, endCoord.y * scaleY, 5, 0, 2 * Math.PI);
         ctx.fill();
       });
     };

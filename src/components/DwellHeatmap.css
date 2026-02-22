@@ -42,36 +42,6 @@
 }
 .mode-toggle button:not(.active):hover { background: #e8e8e8; }
 
-/* Diagnostics toggle button */
-.diag-toggle-btn {
-  align-self: flex-end;
-  padding: 6px 14px;
-  border: 1px solid #aaa;
-  border-radius: 4px;
-  background: #f5f5f5;
-  color: #444;
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.diag-toggle-btn:hover { background: #e8e8e8; }
-
-/* Diagnostics panel */
-.diag-panel {
-  background: #1e1e2e;
-  color: #cdd6f4;
-  border-radius: 6px;
-  padding: 12px 16px;
-  font-size: 12px;
-  font-family: monospace;
-}
-.diag-empty { color: #888; }
-.diag-table { border-collapse: collapse; width: 100%; }
-.diag-table td { padding: 3px 8px; vertical-align: top; }
-.diag-table td:first-child { color: #a6adc8; white-space: nowrap; width: 1%; padding-right: 20px; }
-.diag-table code { color: #f9e2af; }
-.diag-warn { color: #f38ba8; margin-left: 8px; }
-
 
 .control-group {
   display: flex;

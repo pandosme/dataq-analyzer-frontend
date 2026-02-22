@@ -23,7 +23,7 @@ function FilterPanel({ onFilterChange }) {
     from: format(new Date(Date.now() - 24 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
     to: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     class: '',
-    minIdle: '5',
+    minIdle: '0',
     limit: '500',
   });
 
@@ -64,14 +64,14 @@ function FilterPanel({ onFilterChange }) {
       from: format(new Date(Date.now() - 24 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
       to: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       class: '',
-      minIdle: '5',
+      minIdle: '0',
       limit: '500',
     };
     setFilters(defaultFilters);
     onFilterChange({
       from: new Date(defaultFilters.from).toISOString(),
       to: new Date(defaultFilters.to).toISOString(),
-      minIdle: 5,
+      minIdle: 0,
       limit: 500,
     });
   };

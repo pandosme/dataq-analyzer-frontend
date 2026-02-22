@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { configAPI, userPreferencesAPI } from '../services/api';
+import { useAuth } from './AuthContext';
 
 const UserPreferencesContext = createContext();
 
@@ -45,6 +46,8 @@ export const UserPreferencesProvider = ({ children }) => {
     applyTheme(cachedPrefs.theme);
   }
 
+  const { isAuthenticated } = useAuth();
+
   // System defaults (from server)
   const [systemConfig, setSystemConfig] = useState({
     dateFormat: 'US',
@@ -61,8 +64,12 @@ export const UserPreferencesProvider = ({ children }) => {
 
   const [loading, setLoading] = useState(true);
 
-  // Load system config and user preferences
+  // Load system config and user preferences when authenticated
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     const loadSettings = async () => {
       try {
         // Load system config
@@ -100,7 +107,7 @@ export const UserPreferencesProvider = ({ children }) => {
               console.log('User preferences loaded from server:', userResponse.data);
             }
           }
-        } catch (error) {
+        } catch {
           // User preferences might not exist yet, that's okay
           if (import.meta.env.DEV) {
             console.log('No user preferences found on server, using cached/defaults');
@@ -118,7 +125,8 @@ export const UserPreferencesProvider = ({ children }) => {
     };
 
     loadSettings();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   // Update user preferences
   const updatePreferences = async (newPreferences) => {
