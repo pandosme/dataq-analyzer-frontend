@@ -148,17 +148,20 @@ export const pathsAPI = {
     }
 
     // OPTIONAL: minDwell (dwell >= minDwell) — kept for backward compat
-    if (filters.minDwell !== undefined && filters.minDwell !== null && filters.minDwell !== '') {
+    // Skip when 0: $gte:0 is a no-op that excludes documents missing the field
+    if (filters.minDwell !== undefined && filters.minDwell !== null && filters.minDwell !== '' && parseFloat(filters.minDwell) > 0) {
       mongoQuery.dwell = { $gte: parseFloat(filters.minDwell) };
     }
 
     // OPTIONAL: minIdle (maxIdle >= minIdle) — filters paths where object was stationary
-    if (filters.minIdle !== undefined && filters.minIdle !== null && filters.minIdle !== '') {
+    // Skip when 0: $gte:0 is a no-op that excludes documents missing the field
+    if (filters.minIdle !== undefined && filters.minIdle !== null && filters.minIdle !== '' && parseFloat(filters.minIdle) > 0) {
       mongoQuery.maxIdle = { $gte: parseFloat(filters.minIdle) };
     }
 
     // OPTIONAL: minAge (age >= minAge)
-    if (filters.minAge !== undefined && filters.minAge !== null && filters.minAge !== '') {
+    // Skip when 0: $gte:0 is a no-op that excludes documents missing the field
+    if (filters.minAge !== undefined && filters.minAge !== null && filters.minAge !== '' && parseFloat(filters.minAge) > 0) {
       mongoQuery.age = { $gte: parseFloat(filters.minAge) };
     }
 

@@ -329,15 +329,14 @@
   border-radius: 8px;
   padding: 16px;
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  overflow: auto;
+  overflow: hidden;
 }
 
 .forensic-canvas {
-  max-width: 100%;
-  max-height: 100%;
+  display: block;
   border: 1px solid #ddd;
   border-radius: 4px;
   cursor: default;
@@ -383,7 +382,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
   border-radius: 4px;
 }
 

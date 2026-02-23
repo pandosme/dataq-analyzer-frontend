@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useUserPreferences } from '../context/UserPreferencesContext';
 import { formatDateTime as formatDateTimeUtil } from '../utils/dateFormat';
+import useContainerFit from '../hooks/useContainerFit';
 import CameraSelector from './CameraSelector';
 import WebSocketVideoPlayer from './WebSocketVideoPlayer';
 import './ForensicSearch.css';
@@ -10,6 +11,7 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
   const canvasRef = useRef(null);
   const imageRef = useRef(null);
   const videoRef = useRef(null);
+  const containerRef = useRef(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [selectedPath, setSelectedPath] = useState(null);
   const [drawingMode, setDrawingMode] = useState(null); // 'entry' or 'exit'
@@ -36,6 +38,14 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
 
   // Note: Video playback is now handled via WebSocket
   // Backend handles recording server connection (VideoX, Milestone, etc.)
+
+  // Compute image aspect ratio for container-fit sizing
+  const imageAspect = useMemo(() => {
+    if (!imageRef.current) return null;
+    return imageRef.current.width / imageRef.current.height;
+  }, [imageLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fitted = useContainerFit(containerRef, imageAspect);
 
   // Convert time range selection to hours
   const getTimeRangeHours = (selection) => {
@@ -212,14 +222,14 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
     const ctx = canvas.getContext('2d');
 
     // When video is playing, size canvas to match video's rendered dimensions
-    // When showing static image, size canvas to match image
+    // When showing static image, size canvas to container-fitted dimensions
     if (videoInfo && videoDimensions) {
       canvas.width = videoDimensions.videoWidth;
       canvas.height = videoDimensions.videoHeight;
     } else if (!videoInfo && imageRef.current) {
-      const img = imageRef.current;
-      canvas.width = img.width;
-      canvas.height = img.height;
+      // Use container-fitted size if available, otherwise fall back to image size
+      canvas.width = fitted.width || imageRef.current.width;
+      canvas.height = fitted.height || imageRef.current.height;
     }
 
     // Clear canvas
@@ -344,7 +354,7 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
       ctx.arc(lx, ly, 5, 0, 2 * Math.PI);
       ctx.fill();
     });
-  }, [imageLoaded, filteredPaths, selectedPath, entryArea, exitArea, videoInfo, videoDimensions]);
+  }, [imageLoaded, filteredPaths, selectedPath, entryArea, exitArea, videoInfo, videoDimensions, fitted]);
 
   // Helper: Check if click is near a resize handle
   const getHandleAtPosition = (mouseX, mouseY, area, areaType) => {
@@ -876,7 +886,7 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
             <p>Select a camera to perform forensic search</p>
           </div>
         ) : (
-          <div className="media-container">
+          <div className="media-container" ref={containerRef}>
             {!imageLoaded && !videoInfo && <div className="loading">Loading camera view...</div>}
             {videoInfo && (
               <WebSocketVideoPlayer

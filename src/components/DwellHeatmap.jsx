@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import useContainerFit from '../hooks/useContainerFit';
 import './DwellHeatmap.css';
 
 // Grid resolution for heat accumulation (independent of canvas size)
@@ -64,11 +65,20 @@ function handlePositions(a) {
 function DwellHeatmap({ pathData, backgroundImage, loading }) {
   const canvasRef  = useRef(null);
   const overlayRef = useRef(null);
+  const containerRef = useRef(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [opacity, setOpacity]         = useState(0.75);
   const [minPointDwell, setMinPointDwell] = useState(0.5);
   const [mode, setMode]               = useState('points'); // 'points' | 'peak'
   const imageRef = useRef(null);
+
+  // Compute image aspect ratio for container-fit sizing
+  const imageAspect = useMemo(() => {
+    if (!imageRef.current) return null;
+    return imageRef.current.width / imageRef.current.height;
+  }, [imageLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fitted = useContainerFit(containerRef, imageAspect);
 
   // AOI: always exists, defaults to full image
   const [aoi, setAoi]           = useState(DEFAULT_AOI); // committed AOI for rendering
@@ -113,8 +123,8 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
     const ctx = canvas.getContext('2d');
     const img = imageRef.current;
 
-    canvas.width = img.width;
-    canvas.height = img.height;
+    canvas.width = fitted.width || img.width;
+    canvas.height = fitted.height || img.height;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -202,7 +212,7 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
       ctx.fillText('AOI', ax + 4, ay - 5);
     }
 
-  }, [imageLoaded, pathData, opacity, minPointDwell, mode, aoi, isFullImage]);
+  }, [imageLoaded, pathData, opacity, minPointDwell, mode, aoi, isFullImage, fitted]);
 
   // --- AOI overlay: draw rect + handles while editing ---
   const drawOverlay = useCallback((a) => {
@@ -422,7 +432,7 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
         <span className="legend-label">High dwell</span>
       </div>
 
-      <div className="canvas-container">
+      <div className="canvas-container" ref={containerRef}>
         {loading && <div className="loading">Loading...</div>}
         {!imageLoaded && !loading && <div className="loading">Loading camera view...</div>}
         <div className="canvas-wrapper">

@@ -1,11 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
+import useContainerFit from '../hooks/useContainerFit';
 import './FlowHeatmap.css';
 
 function FlowHeatmap({ pathData, backgroundImage, loading }) {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [transparency, setTransparency] = useState(0.7);
   const imageRef = useRef(null);
+
+  // Compute image aspect ratio for container-fit sizing
+  const imageAspect = useMemo(() => {
+    if (!imageRef.current) return null;
+    return imageRef.current.width / imageRef.current.height;
+  }, [imageLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fitted = useContainerFit(containerRef, imageAspect);
 
   // Load background image
   useEffect(() => {
@@ -59,9 +69,9 @@ function FlowHeatmap({ pathData, backgroundImage, loading }) {
     const ctx = canvas.getContext('2d');
     const img = imageRef.current;
 
-    // Set canvas size to match image
-    canvas.width = img.width;
-    canvas.height = img.height;
+    // Set canvas size to fit container while preserving aspect ratio
+    canvas.width = fitted.width || img.width;
+    canvas.height = fitted.height || img.height;
 
     // Clear canvas and draw background image
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -118,7 +128,7 @@ function FlowHeatmap({ pathData, backgroundImage, loading }) {
       ctx.arc(endX, endY, 4, 0, 2 * Math.PI);
       ctx.fill();
     });
-  }, [imageLoaded, pathData, transparency]);
+  }, [imageLoaded, pathData, transparency, fitted]);
 
   const getColorForClass = (className) => {
     const colors = {
@@ -158,7 +168,7 @@ function FlowHeatmap({ pathData, backgroundImage, loading }) {
         </div>
       </div>
 
-      <div className="canvas-container">
+      <div className="canvas-container" ref={containerRef}>
         {!imageLoaded && <div className="loading">Loading camera view...</div>}
         <canvas
           ref={canvasRef}

@@ -36,7 +36,7 @@ function fmtDate(iso) {
 // days is now tracked by the server (distinct days with path data)
 
 // ─── Zone Editor Canvas ───────────────────────────────────────────────────────
-function ZoneEditor({ snapshot, zones, paths, onChange }) {
+function ZoneEditor({ snapshot, zones, paths, onChange, readOnly }) {
   const canvasRef   = useRef(null);
   const imgRef      = useRef(null);
   const zonesRef    = useRef(zones);     // always current, readable from handlers without stale closure
@@ -278,11 +278,11 @@ function ZoneEditor({ snapshot, zones, paths, onChange }) {
     <canvas
       ref={canvasRef}
       className="zone-canvas"
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseLeave}
-      style={{ cursor }}
+      onMouseDown={readOnly ? undefined : onMouseDown}
+      onMouseMove={readOnly ? undefined : onMouseMove}
+      onMouseUp={readOnly ? undefined : onMouseUp}
+      onMouseLeave={readOnly ? undefined : onMouseLeave}
+      style={{ cursor: readOnly ? 'default' : cursor }}
     />
   );
 }
@@ -618,12 +618,12 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
             <div className="field-group">
               <label className="field-sublabel">Topic</label>
               <input type="text" className="text-input" value={mqttTopic} placeholder="e.g. dataq/counters/my-counter"
-                onChange={e => setMqttTopic(e.target.value)} />
+                readOnly={readOnly} onChange={e => setMqttTopic(e.target.value)} />
             </div>
             <div className="field-group">
               <label className="field-sublabel">Interval (seconds)</label>
               <input type="number" className="text-input" min="60" max="3600" value={mqttInterval}
-                onChange={e => setMqttInterval(Number(e.target.value) || 60)} />
+                readOnly={readOnly} onChange={e => setMqttInterval(Number(e.target.value) || 60)} />
               <p className="hint">60 – 3600 seconds</p>
             </div>
           </div>
@@ -631,7 +631,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
 
         <div className="step1-canvas">
           {snapshot ? (
-            <ZoneEditor snapshot={snapshot} zones={zones} paths={paths} onChange={setZones} />
+            <ZoneEditor snapshot={snapshot} zones={zones} paths={paths} onChange={setZones} readOnly={readOnly} />
           ) : (
             <div className="canvas-placeholder">Loading snapshot…</div>
           )}
@@ -664,12 +664,12 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
                       <span className="zone-chip" style={{ color: ZONE_COLORS_BORDER[toZone] }}>{c.to}</span>
                     </td>
                     <td>
-                      <input className="counter-name-input" placeholder="e.g. Entrance → Exit" value={c.name}
+                      <input className="counter-name-input" placeholder="e.g. Entrance → Exit" value={c.name} readOnly={readOnly}
                         onChange={e => setCounters(prev => prev.map((x, i) => i === ci ? { ...x, name: e.target.value } : x))} />
                     </td>
                     <td>
                       <label className="enabled-check">
-                        <input type="checkbox" checked={c.enabled}
+                        <input type="checkbox" checked={c.enabled} disabled={readOnly}
                           onChange={e => setCounters(prev => prev.map((x, i) => i === ci ? { ...x, enabled: e.target.checked } : x))} />
                       </label>
                     </td>
