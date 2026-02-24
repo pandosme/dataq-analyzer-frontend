@@ -136,7 +136,46 @@
   opacity: 0.6;
 }
 
-/* Color Legend */
+/* Idle-time slider — wider than other controls */
+.idle-slider-group {
+  flex: 2;
+  min-width: 220px;
+}
+
+/* Slider range labels (min / max below the track) */
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+  margin-top: -4px;
+}
+
+/* Stats badge */
+.stats-group {
+  min-width: 110px;
+  flex: 0 0 auto;
+}
+.stats-badge {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 6px 10px;
+  background: #f0f4ff;
+  border: 1px solid #d0d8f0;
+  border-radius: 6px;
+}
+.stats-count {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ff7800;
+}
+.stats-unit {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Legend — single-colour swatch */
 .dwell-legend {
   display: flex;
   align-items: center;
@@ -147,27 +186,20 @@
   border-radius: 6px;
 }
 
+.legend-swatch {
+  width: 28px;
+  height: 16px;
+  border-radius: 4px;
+  background: rgba(255, 120, 0, 0.75);
+  border: 1px solid rgba(255, 120, 0, 0.9);
+  flex-shrink: 0;
+}
+
 .legend-label {
   font-size: 12px;
   font-weight: 500;
   color: #666;
   white-space: nowrap;
-}
-
-.gradient-bar {
-  flex: 1;
-  height: 16px;
-  border-radius: 4px;
-  background: linear-gradient(
-    to right,
-    #0000FF 0%,
-    #00FFFF 20%,
-    #00FF00 40%,
-    #FFFF00 60%,
-    #FFA500 80%,
-    #FF0000 100%
-  );
-  border: 1px solid #ddd;
 }
 
 /* Loading State */
@@ -199,7 +231,55 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* Dark Theme */
+/* Inner wrapper — sizes to the heatmap canvas so overlay aligns exactly */
+.canvas-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* AOI overlay canvas — sits on top of the heatmap canvas */
+.aoi-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+  z-index: 2;
+}
+
+/* AOI controls */
+.aoi-controls { min-width: 120px; }
+.aoi-buttons {
+  display: flex;
+  gap: 6px;
+}
+.btn-aoi-save {
+  background: #ff6d00 !important;
+  color: #fff !important;
+  border-color: #ff6d00 !important;
+  font-weight: 700;
+}
+.btn-aoi-save:hover {
+  background: #e65100 !important;
+  border-color: #e65100 !important;
+}
+
+/* Query floor hint */
+.query-floor {
+  font-weight: 400;
+  font-size: 11px;
+  color: #888;
+  margin-left: 4px;
+}
+.dark-theme .query-floor {
+  color: #666;
+}
+
+.dark-theme .loading,
+.dark-theme .no-data {
+  color: #999;
+}
 .dark-theme .dwell-heatmap {
   background: #0f0f0f;
 }
@@ -265,6 +345,21 @@
   color: #666;
 }
 
+.dark-theme .range-labels {
+  color: #666;
+}
+
+.dark-theme .stats-badge {
+  background: #1e2230;
+  border-color: #2a3050;
+}
+.dark-theme .stats-count {
+  color: #ffaa44;
+}
+.dark-theme .stats-unit {
+  color: #888;
+}
+
 .dark-theme .dwell-legend {
   background: #1a1a1a;
   border-color: #3a3a3a;
@@ -274,46 +369,8 @@
   color: #999;
 }
 
-.dark-theme .gradient-bar {
-  border-color: #3a3a3a;
-}
-
 .dark-theme .heatmap-canvas {
   border-color: #3a3a3a;
-}
-
-/* Inner wrapper — sizes to the heatmap canvas so overlay aligns exactly */
-.canvas-wrapper {
-  position: relative;
-  display: inline-block;
-}
-
-/* AOI overlay canvas — sits on top of the heatmap canvas */
-.aoi-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  cursor: default;
-  z-index: 2;
-}
-
-/* AOI controls */
-.aoi-controls { min-width: 120px; }
-.aoi-buttons {
-  display: flex;
-  gap: 6px;
-}
-.btn-aoi-save {
-  background: #ff6d00 !important;
-  color: #fff !important;
-  border-color: #ff6d00 !important;
-  font-weight: 700;
-}
-.btn-aoi-save:hover {
-  background: #e65100 !important;
-  border-color: #e65100 !important;
 }
 
 .dark-theme .loading,

@@ -172,6 +172,7 @@ function FilterPanel({ onFilterChange }) {
           <option value="Bag">Bag</option>
           <option value="Vehicle">Vehicle</option>
           <option value="Animal">Animal</option>
+          <option value="Undefined">Undefined</option>
           <option value="Other">Other</option>
         </select>
       </div>

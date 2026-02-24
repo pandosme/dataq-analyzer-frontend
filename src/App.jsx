@@ -218,7 +218,13 @@ function App() {
     ) : isFlow ? (
       <FlowHeatmap pathData={pathData} backgroundImage={backgroundImage} loading={loading} />
     ) : (
-      <DwellHeatmap pathData={pathData} backgroundImage={backgroundImage} loading={loading} />
+      <DwellHeatmap
+        pathData={pathData}
+        backgroundImage={backgroundImage}
+        loading={loading}
+        filters={filters}
+        onQuery={loadPathData}
+      />
     );
 
     const rightPanel = (

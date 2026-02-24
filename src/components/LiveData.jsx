@@ -14,7 +14,7 @@ function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
   const [recentPaths, setRecentPaths] = useState([]);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
-    objectTypes: ['Human', 'Car', 'Truck', 'Bus', 'Bike', 'LicensePlate', 'Head', 'Bag', 'Vehicle', 'Animal', 'Other'],
+    objectTypes: ['Human', 'Car', 'Truck', 'Bus', 'Bike', 'LicensePlate', 'Head', 'Bag', 'Vehicle', 'Animal', 'Undefined', 'Other'],
     minDistance: 20,
     minAge: 2,
   });
@@ -27,7 +27,7 @@ function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
   useEffect(() => {
     if (!cameraDetails?.filters) return;
     setFilters({
-      objectTypes: cameraDetails.filters.objectTypes || ['Human', 'Car', 'Truck', 'Bus', 'Bike', 'LicensePlate', 'Head', 'Bag', 'Vehicle', 'Animal', 'Other'],
+      objectTypes: cameraDetails.filters.objectTypes || ['Human', 'Car', 'Truck', 'Bus', 'Bike', 'LicensePlate', 'Head', 'Bag', 'Vehicle', 'Animal', 'Undefined', 'Other'],
       minDistance: cameraDetails.filters.minDistance !== undefined ? cameraDetails.filters.minDistance : 20,
       minAge: cameraDetails.filters.minAge !== undefined ? cameraDetails.filters.minAge : 2,
     });
@@ -240,6 +240,7 @@ function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
       Head: '#FFD700',          // Gold
       Animal: '#7FFF00',        // Chartreuse
       Vehicle: '#00FFFF',       // Cyan (Aqua)
+      Undefined: '#A0A0A0',    // Gray
       Other: '#FF0000',         // Red
     };
     return colors[className] || '#FF0000'; // Red for unknown
@@ -479,6 +480,15 @@ function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
                   onChange={() => handleObjectTypeChange('Animal')}
                 />
                 <span>Animal</span>
+              </label>
+
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={filters.objectTypes.includes('Undefined')}
+                  onChange={() => handleObjectTypeChange('Undefined')}
+                />
+                <span>Undefined</span>
               </label>
 
               <label className="checkbox-label checkbox-single">

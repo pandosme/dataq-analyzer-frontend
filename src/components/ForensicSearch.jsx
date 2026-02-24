@@ -127,6 +127,7 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
       Head: '#FFD700',
       Animal: '#7FFF00',
       Vehicle: '#00FFFF',
+      Undefined: '#A0A0A0',
       Other: '#FF0000',
     };
     return colors[className] || '#FF0000';
@@ -740,6 +741,7 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
                 <option value="Bag">Bag</option>
                 <option value="Vehicle">Vehicle</option>
                 <option value="Animal">Animal</option>
+                <option value="Undefined">Undefined</option>
                 <option value="Other">Other</option>
               </select>
             </div>

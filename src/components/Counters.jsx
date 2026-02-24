@@ -8,7 +8,7 @@ import './Counters.css';
 const ZONE_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
 const ZONE_COLORS_FILL   = ['#e74c3c50', '#3498db50', '#2ecc7150', '#f39c1250', '#9b59b650', '#1abc9c50'];
 const ZONE_COLORS_BORDER = ['#e74c3c',   '#3498db',   '#2ecc71',   '#f39c12',   '#9b59b6',   '#1abc9c'];
-const ALL_CLASSES = ['Human', 'Car', 'Truck', 'Bus', 'Bike'];
+const ALL_CLASSES = ['Human', 'Car', 'Truck', 'Bus', 'Bike', 'Vehicle', 'Undefined'];
 
 // Zone-editor hit-test constants
 const HANDLE_HIT  = 12; // px click radius around a handle
@@ -766,7 +766,7 @@ function CounterCreate({ onSave, onCancel }) {
   const [loadingSnap, setLoadingSnap] = useState(false);
   const [zones, setZones]             = useState([]);
   const [setName, setSetName]         = useState('');
-  const [objectClasses, setObjCls]    = useState(['Car']);
+  const [objectClasses, setObjCls]    = useState(['Vehicle']);
   const [pairs, setPairs]             = useState([]);
   const [mqtt, setMqtt]               = useState({ enabled: false, intervalSeconds: 300, topic: '' });
   const [saving, setSaving]           = useState(false);

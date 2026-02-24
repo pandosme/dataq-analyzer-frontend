@@ -2,43 +2,28 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import useContainerFit from '../hooks/useContainerFit';
 import './DwellHeatmap.css';
 
-// Grid resolution for heat accumulation (independent of canvas size)
+// Grid resolution for density accumulation
 const GRID_W = 200;
 const GRID_H = 200;
-const SPREAD = 14; // Gaussian spread in grid cells
-const SIGMA2 = (SPREAD / 2.5) ** 2;
+
+// Gaussian spread for path-points mode
+const SPREAD   = 8;
+const SIGMA2   = (SPREAD / 2.5) ** 2;
+
+// Absolute density floor & edge ramp
+const DENSITY_CUTOFF = 0.25;
+const EDGE_SOFTNESS  = 0.6;
+
+// Single colour (warm orange)
+const ZONE_R = 255, ZONE_G = 120, ZONE_B = 0;
 
 // AOI handle constants
-const HANDLE_SIZE = 8;   // drawn size (px)
-const HANDLE_HIT  = 14;  // hit-test radius (px)
-
-// Default AOI = full image (no filtering effect)
+const HANDLE_SIZE = 8;
+const HANDLE_HIT  = 14;
 const DEFAULT_AOI = { x1: 0, y1: 0, x2: 1, y2: 1 };
-
-// HSV heat colour: t=0 → blue, t=1 → red
-function heatColor(t) {
-  const h = (1 - t) * 240; // 240° blue → 0° red
-  const c = 1, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = 0;
-  let r, g, b;
-  if (h < 60)       { r = c; g = x; b = 0; }
-  else if (h < 120) { r = x; g = c; b = 0; }
-  else if (h < 180) { r = 0; g = c; b = x; }
-  else if (h < 240) { r = 0; g = x; b = c; }
-  else if (h < 300) { r = x; g = 0; b = c; }
-  else              { r = c; g = 0; b = x; }
-  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
-}
-
-// Check if a normalized coordinate (0–1) falls inside the AOI rect (also 0–1)
-function insideAOI(normX, normY, aoi) {
-  const x1 = Math.min(aoi.x1, aoi.x2), x2 = Math.max(aoi.x1, aoi.x2);
-  const y1 = Math.min(aoi.y1, aoi.y2), y2 = Math.max(aoi.y1, aoi.y2);
-  return normX >= x1 && normX <= x2 && normY >= y1 && normY <= y2;
-}
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-// Normalize an AOI so x1<x2, y1<y2
 function normAoi(a) {
   return {
     x1: Math.min(a.x1, a.x2), y1: Math.min(a.y1, a.y2),
@@ -46,7 +31,6 @@ function normAoi(a) {
   };
 }
 
-// 8 handle positions around a rectangle
 function handlePositions(a) {
   const n = normAoi(a);
   const mx = (n.x1 + n.x2) / 2, my = (n.y1 + n.y2) / 2;
@@ -62,17 +46,55 @@ function handlePositions(a) {
   ];
 }
 
-function DwellHeatmap({ pathData, backgroundImage, loading }) {
-  const canvasRef  = useRef(null);
-  const overlayRef = useRef(null);
-  const containerRef = useRef(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [opacity, setOpacity]         = useState(0.75);
-  const [minPointDwell, setMinPointDwell] = useState(0.5);
-  const [mode, setMode]               = useState('points'); // 'points' | 'peak'
-  const imageRef = useRef(null);
+/** Pretty-print seconds */
+function fmtTime(sec) {
+  if (sec == null) return '—';
+  const s = Math.round(sec);
+  if (s < 60)  return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  if (m < 60) return rs > 0 ? `${m}m ${rs}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+}
 
-  // Compute image aspect ratio for container-fit sizing
+function autoStep(range) {
+  if (range <= 0)   return 0.1;
+  if (range <= 10)  return 0.1;
+  if (range <= 60)  return 0.5;
+  if (range <= 300) return 1;
+  if (range <= 1800) return 2;
+  return 5;
+}
+
+// ---------------------------------------------------------------------------
+
+function DwellHeatmap({ pathData, backgroundImage, loading, filters, onQuery }) {
+  const canvasRef     = useRef(null);
+  const overlayRef    = useRef(null);
+  const containerRef  = useRef(null);
+  const imageRef      = useRef(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [opacity, setOpacity]         = useState(0.65);
+
+  // AOI state
+  const [aoi, setAoi]             = useState(DEFAULT_AOI);
+  const [editAoi, setEditAoi]     = useState(null);
+  const [aoiEditing, setAoiEditing] = useState(false);
+  const dragRef = useRef(null);
+
+  const isFullImage = useCallback((a) => {
+    return a.x1 <= 0.001 && a.y1 <= 0.001 && a.x2 >= 0.999 && a.y2 >= 0.999;
+  }, []);
+
+  /* ---------- query-level minIdle ---------- */
+  const queryMinIdle = useMemo(() => {
+    const v = filters?.minIdle;
+    return (v !== undefined && v !== null && v !== '' && parseFloat(v) > 0) ? parseFloat(v) : 0;
+  }, [filters]);
+
+  /* ---------- image aspect ratio ---------- */
   const imageAspect = useMemo(() => {
     if (!imageRef.current) return null;
     return imageRef.current.width / imageRef.current.height;
@@ -80,17 +102,41 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
 
   const fitted = useContainerFit(containerRef, imageAspect);
 
-  // AOI: always exists, defaults to full image
-  const [aoi, setAoi]           = useState(DEFAULT_AOI); // committed AOI for rendering
-  const [editAoi, setEditAoi]   = useState(null);         // working copy during editing (null = not editing)
-  const [aoiEditing, setAoiEditing] = useState(false);
-  const dragRef = useRef(null); // { type: 'move'|'handle', handle?, startAoi, startMouse }
+  /* ---------- idle-time range from dataset ---------- */
+  const idleRange = useMemo(() => {
+    if (!pathData || pathData.length === 0) return { min: queryMinIdle, max: 60, total: 0 };
 
-  const isFullImage = useCallback((a) => {
-    return a.x1 <= 0.001 && a.y1 <= 0.001 && a.x2 >= 0.999 && a.y2 >= 0.999;
-  }, []);
+    let lo = Infinity, hi = 0, n = 0;
+    pathData.forEach((ev) => {
+      if (!ev.path) return;
+      ev.path.slice(0, -1).forEach((pt) => {
+        if (pt.d > 0) { lo = Math.min(lo, pt.d); hi = Math.max(hi, pt.d); n++; }
+      });
+    });
 
-  // Load background image
+    if (lo === Infinity) lo = queryMinIdle;
+    if (hi === 0) hi = 60;
+    // Slider min = the query-level minIdle so user sees what they asked for
+    const sliderMin = Math.max(queryMinIdle, Math.floor(lo));
+    return { min: sliderMin, max: Math.ceil(hi), total: n };
+  }, [pathData, queryMinIdle]);
+
+  /* ---------- idle-time slider ---------- */
+  const [idleThreshold, setIdleThreshold] = useState(0);
+  useEffect(() => { setIdleThreshold(idleRange.min); }, [idleRange.min]);
+
+  /* ---------- qualifying point count ---------- */
+  const qualifyingCount = useMemo(() => {
+    if (!pathData || pathData.length === 0) return 0;
+    let c = 0;
+    pathData.forEach((ev) => {
+      if (!ev.path) return;
+      ev.path.slice(0, -1).forEach((pt) => { if (pt.d >= idleThreshold) c++; });
+    });
+    return c;
+  }, [pathData, idleThreshold]);
+
+  /* ---------- load background image ---------- */
   useEffect(() => {
     if (!backgroundImage) {
       if (canvasRef.current) {
@@ -101,7 +147,6 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
       imageRef.current = null;
       return;
     }
-
     if (canvasRef.current) {
       const ctx = canvasRef.current.getContext('2d');
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -110,20 +155,20 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
     imageRef.current = null;
 
     const img = new Image();
-    img.onload = () => { imageRef.current = img; setImageLoaded(true); };
+    img.onload  = () => { imageRef.current = img; setImageLoaded(true); };
     img.onerror = () => { setImageLoaded(false); };
     img.src = backgroundImage;
   }, [backgroundImage]);
 
-  // --- Build heat map and draw (uses committed aoi) ---
+  /* ---------- render heatmap ---------- */
   useEffect(() => {
     if (!imageLoaded || !imageRef.current || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const img = imageRef.current;
+    const ctx    = canvas.getContext('2d');
+    const img    = imageRef.current;
 
-    canvas.width = fitted.width || img.width;
+    canvas.width  = fitted.width  || img.width;
     canvas.height = fitted.height || img.height;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -131,80 +176,66 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
 
     if (!pathData || pathData.length === 0) return;
 
-    // --- Accumulate heat on a fixed-resolution grid ---
+    // Accumulate count-based density (path-points only)
     const heat = new Float32Array(GRID_W * GRID_H);
 
-    const addHeat = (normX, normY, weight) => {
-      if (!insideAOI(normX, normY, aoi)) return;
+    const addPoint = (normX, normY) => {
       const gx = Math.round(normX * (GRID_W - 1));
       const gy = Math.round(normY * (GRID_H - 1));
       for (let dy = -SPREAD; dy <= SPREAD; dy++) {
         for (let dx = -SPREAD; dx <= SPREAD; dx++) {
           const nx = gx + dx, ny = gy + dy;
           if (nx >= 0 && nx < GRID_W && ny >= 0 && ny < GRID_H) {
-            heat[ny * GRID_W + nx] += weight * Math.exp(-(dx * dx + dy * dy) / (2 * SIGMA2));
+            heat[ny * GRID_W + nx] += Math.exp(-(dx * dx + dy * dy) / (2 * SIGMA2));
           }
         }
       }
     };
 
-    if (mode === 'peak') {
-      pathData.forEach((event) => {
-        const idle = event.maxIdle;
-        if (!idle || idle < minPointDwell) return;
-        const x = event.bx !== undefined ? event.bx / 1000 : (event.path?.[0]?.x ?? 500) / 1000;
-        const y = event.by !== undefined ? event.by / 1000 : (event.path?.[0]?.y ?? 500) / 1000;
-        addHeat(x, y, idle);
+    pathData.forEach((ev) => {
+      if (!ev.path || ev.path.length === 0) return;
+      ev.path.slice(0, -1).forEach((pt) => {
+        if (!pt.d || pt.d < idleThreshold) return;
+        addPoint(pt.x / 1000, pt.y / 1000);
       });
-    } else {
-      pathData.forEach((event) => {
-        if (!event.path || event.path.length === 0) return;
-        const points = event.path.slice(0, -1);
-        points.forEach((point) => {
-          if (!point.d || point.d < minPointDwell) return;
-          addHeat(point.x / 1000, point.y / 1000, point.d);
-        });
-      });
-    }
+    });
 
     let maxHeat = 0;
-    for (let i = 0; i < heat.length; i++) {
-      if (heat[i] > maxHeat) maxHeat = heat[i];
-    }
+    for (let i = 0; i < heat.length; i++) if (heat[i] > maxHeat) maxHeat = heat[i];
     if (maxHeat === 0) return;
 
     const imageData = new ImageData(GRID_W, GRID_H);
     for (let i = 0; i < GRID_W * GRID_H; i++) {
-      const t = heat[i] / maxHeat;
-      if (t < 0.02) continue;
-      const [r, g, b] = heatColor(t);
-      const alpha = Math.round(Math.min(t * 1.5, 1) * opacity * 255);
-      imageData.data[i * 4 + 0] = r;
-      imageData.data[i * 4 + 1] = g;
-      imageData.data[i * 4 + 2] = b;
-      imageData.data[i * 4 + 3] = alpha;
+      const d = heat[i];
+      if (d < DENSITY_CUTOFF) continue;
+      const edge = clamp((d - DENSITY_CUTOFF) / EDGE_SOFTNESS, 0, 1);
+      const a    = Math.round(edge * opacity * 255);
+      imageData.data[i * 4 + 0] = ZONE_R;
+      imageData.data[i * 4 + 1] = ZONE_G;
+      imageData.data[i * 4 + 2] = ZONE_B;
+      imageData.data[i * 4 + 3] = a;
     }
 
-    const offscreen = document.createElement('canvas');
-    offscreen.width = GRID_W;
-    offscreen.height = GRID_H;
+    const offscreen    = document.createElement('canvas');
+    offscreen.width    = GRID_W;
+    offscreen.height   = GRID_H;
     offscreen.getContext('2d').putImageData(imageData, 0, 0);
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
 
-    // Draw AOI outline on heatmap canvas (only when not full-image)
-    if (!isFullImage(aoi)) {
-      const n = normAoi(aoi);
-      const ax = n.x1 * canvas.width, ay = n.y1 * canvas.height;
+    // Draw AOI outline when not full-image (and not in edit mode)
+    if (!isFullImage(aoi) && !aoiEditing) {
+      const n  = normAoi(aoi);
+      const ax = n.x1 * canvas.width,  ay = n.y1 * canvas.height;
       const aw = (n.x2 - n.x1) * canvas.width, ah = (n.y2 - n.y1) * canvas.height;
       ctx.strokeStyle = '#00ff00';
-      ctx.lineWidth = 2;
+      ctx.lineWidth   = 2;
       ctx.setLineDash([6, 4]);
       ctx.strokeRect(ax, ay, aw, ah);
       ctx.setLineDash([]);
-      ctx.font = '13px sans-serif';
+      ctx.font      = '13px sans-serif';
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       const tw = ctx.measureText('AOI').width;
       ctx.fillRect(ax, ay - 18, tw + 8, 18);
@@ -212,9 +243,9 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
       ctx.fillText('AOI', ax + 4, ay - 5);
     }
 
-  }, [imageLoaded, pathData, opacity, minPointDwell, mode, aoi, isFullImage, fitted]);
+  }, [imageLoaded, pathData, opacity, idleThreshold, aoi, aoiEditing, isFullImage, fitted]);
 
-  // --- AOI overlay: draw rect + handles while editing ---
+  /* ========== AOI overlay drawing ========== */
   const drawOverlay = useCallback((a) => {
     const overlay = overlayRef.current;
     const canvas  = canvasRef.current;
@@ -228,17 +259,14 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
     const ax = n.x1 * overlay.width,  ay = n.y1 * overlay.height;
     const aw = (n.x2 - n.x1) * overlay.width, ah = (n.y2 - n.y1) * overlay.height;
 
-    // Dim outside AOI
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.fillRect(0, 0, overlay.width, overlay.height);
     ctx.clearRect(ax, ay, aw, ah);
 
-    // Green border
     ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 2;
+    ctx.lineWidth   = 2;
     ctx.strokeRect(ax, ay, aw, ah);
 
-    // Handles
     ctx.fillStyle   = '#00ff00';
     ctx.strokeStyle = '#000';
     ctx.lineWidth   = 1;
@@ -249,19 +277,16 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
       ctx.strokeRect(hx, hy, HANDLE_SIZE, HANDLE_SIZE);
     });
 
-    // Label
     ctx.font      = 'bold 13px sans-serif';
     ctx.fillStyle = '#00ff00';
     ctx.fillText('AOI', ax + 4, ay - 5 > 14 ? ay - 5 : ay + 14);
   }, []);
 
-  // Redraw overlay whenever editAoi changes
   useEffect(() => {
     if (!aoiEditing || !editAoi) return;
     drawOverlay(editAoi);
   }, [aoiEditing, editAoi, drawOverlay]);
 
-  // Convert mouse event to normalized 0–1 coords relative to the overlay (which matches the canvas)
   const toNorm = useCallback((e) => {
     const el = overlayRef.current || canvasRef.current;
     if (!el) return { x: 0, y: 0 };
@@ -272,7 +297,6 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
     };
   }, []);
 
-  // Hit-test: which handle (if any) is near the mouse?
   const hitTestHandle = useCallback((a, mx, my) => {
     const el = overlayRef.current || canvasRef.current;
     if (!el) return null;
@@ -286,7 +310,6 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
     return null;
   }, []);
 
-  // Hit-test: is mouse inside the AOI rect body?
   const hitTestBody = useCallback((a, mx, my) => {
     const n = normAoi(a);
     return mx >= n.x1 && mx <= n.x2 && my >= n.y1 && my <= n.y2;
@@ -297,10 +320,7 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
     e.preventDefault();
     const p = toNorm(e);
     const h = hitTestHandle(editAoi, p.x, p.y);
-    if (h) {
-      dragRef.current = { type: 'handle', handle: h.key, startAoi: { ...editAoi }, startMouse: p };
-      return;
-    }
+    if (h) { dragRef.current = { type: 'handle', handle: h.key, startAoi: { ...editAoi }, startMouse: p }; return; }
     if (hitTestBody(editAoi, p.x, p.y)) {
       dragRef.current = { type: 'move', startAoi: { ...editAoi }, startMouse: p };
     }
@@ -309,29 +329,23 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
   const handleMouseMove = useCallback((e) => {
     if (!aoiEditing || !editAoi) return;
     const p = toNorm(e);
-
-    // Update cursor
     const overlay = overlayRef.current;
     if (overlay && !dragRef.current) {
       const h = hitTestHandle(editAoi, p.x, p.y);
-      if (h) { overlay.style.cursor = h.cursor; }
-      else if (hitTestBody(editAoi, p.x, p.y)) { overlay.style.cursor = 'move'; }
-      else { overlay.style.cursor = 'default'; }
+      if (h) overlay.style.cursor = h.cursor;
+      else if (hitTestBody(editAoi, p.x, p.y)) overlay.style.cursor = 'move';
+      else overlay.style.cursor = 'default';
     }
-
     if (!dragRef.current) return;
-
     const d  = dragRef.current;
     const dx = p.x - d.startMouse.x;
     const dy = p.y - d.startMouse.y;
     const sa = d.startAoi;
-
     if (d.type === 'move') {
       const n = normAoi(sa);
       const w = n.x2 - n.x1, h = n.y2 - n.y1;
-      let nx1 = n.x1 + dx, ny1 = n.y1 + dy;
-      nx1 = clamp(nx1, 0, 1 - w);
-      ny1 = clamp(ny1, 0, 1 - h);
+      let nx1 = clamp(n.x1 + dx, 0, 1 - w);
+      let ny1 = clamp(n.y1 + dy, 0, 1 - h);
       setEditAoi({ x1: nx1, y1: ny1, x2: nx1 + w, y2: ny1 + h });
     } else if (d.type === 'handle') {
       const n = normAoi(sa);
@@ -345,79 +359,104 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
     }
   }, [aoiEditing, editAoi, toNorm, hitTestHandle, hitTestBody]);
 
-  const handleMouseUp = useCallback(() => {
-    dragRef.current = null;
-  }, []);
+  const handleMouseUp = useCallback(() => { dragRef.current = null; }, []);
 
-  // --- Button handlers ---
+  /* ---------- AOI button handlers ---------- */
   const enterEdit = useCallback(() => {
     setEditAoi({ ...aoi });
     setAoiEditing(true);
   }, [aoi]);
 
+  // Save AOI → commit & re-query with the AOI bounding box
   const saveAoi = useCallback(() => {
-    if (editAoi) setAoi(normAoi(editAoi));
+    if (!editAoi) return;
+    const saved = normAoi(editAoi);
+    setAoi(saved);
     setAoiEditing(false);
     setEditAoi(null);
-  }, [editAoi]);
+    // Re-query with AOI so the database returns only paths inside the box
+    if (onQuery) {
+      onQuery({ aoi: saved });
+    }
+  }, [editAoi, onQuery]);
 
   const resetAoi = useCallback(() => {
     setAoi(DEFAULT_AOI);
     setEditAoi(null);
     setAoiEditing(false);
-  }, []);
+    // Re-query without AOI
+    if (onQuery) {
+      onQuery({ aoi: undefined });
+    }
+  }, [onQuery]);
+
+  /* ---------- UI ---------- */
+  const step = autoStep(idleRange.max - idleRange.min);
 
   return (
     <div className="dwell-heatmap">
-      {/* Controls */}
+
+      {/* ---- Controls ---- */}
       <div className="heatmap-controls">
-        <div className="control-group">
-          <label>Mode</label>
-          <div className="mode-toggle">
-            <button
-              className={mode === 'points' ? 'active' : ''}
-              onClick={() => setMode('points')}
-              title="Uses every point along each tracked path. Each point is weighted by how long the object paused there. Gives a detailed, granular heatmap."
-            >Path Points</button>
-            <button
-              className={mode === 'peak' ? 'active' : ''}
-              onClick={() => setMode('peak')}
-              title="Uses only the single location per path where the object was stationary the longest. Best for identifying queuing spots and waiting areas."
-            >Peak Idle</button>
+
+        {/* Dynamic idle-time slider */}
+        <div className="control-group idle-slider-group">
+          <label>
+            Min idle: <strong>{fmtTime(idleThreshold)}</strong>
+            {queryMinIdle > 0 && (
+              <span className="query-floor"> (query floor: {fmtTime(queryMinIdle)})</span>
+            )}
+          </label>
+          <input
+            type="range"
+            min={idleRange.min}
+            max={idleRange.max}
+            step={step}
+            value={idleThreshold}
+            onChange={(e) => setIdleThreshold(parseFloat(e.target.value))}
+            title="Filter out points that idled less than this. Slide right to focus on longer stops."
+          />
+          <div className="range-labels">
+            <span>{fmtTime(idleRange.min)}</span>
+            <span>{fmtTime(idleRange.max)}</span>
           </div>
         </div>
-        <div className="control-group">
-          <label>Min Idle: {minPointDwell}s</label>
-          <input
-            type="range" min="0.1" max="120" step="0.1"
-            value={minPointDwell}
-            onChange={(e) => setMinPointDwell(parseFloat(e.target.value))}
-            title="Only include points where the object was idle for at least this many seconds. Increase to focus on longer stops, decrease to include brief pauses."
-          />
+
+        {/* Stats badge */}
+        <div className="control-group stats-group">
+          <label>Matching</label>
+          <div className="stats-badge">
+            <span className="stats-count">{qualifyingCount}</span>
+            <span className="stats-unit">/ {idleRange.total} points</span>
+          </div>
         </div>
+
+        {/* Overlay opacity */}
         <div className="control-group">
-          <label>Intensity: {Math.round(opacity * 100)}%</label>
+          <label>Overlay: {Math.round(opacity * 100)}%</label>
           <input
             type="range" min="0.1" max="1" step="0.05"
             value={opacity}
             onChange={(e) => setOpacity(parseFloat(e.target.value))}
-            title="Controls the opacity of the heatmap overlay on top of the camera image. Lower values make the background more visible."
+            title="Opacity of the dwell-zone overlay."
           />
         </div>
+
+        {/* AOI controls */}
         <div className="control-group aoi-controls">
-          <label title="Limit the heatmap to a specific area. Useful for excluding zones with known high idle times (e.g. parked vehicles, waiting areas) so you can focus on the area you want to analyze.">Area of Interest</label>
+          <label title="Area of Interest — limits the database query to paths whose peak-idle position falls within this rectangle, maximizing your page limit with relevant data.">Area of Interest</label>
           <div className="aoi-buttons">
             {!aoiEditing ? (
-              <button className="btn-small btn-secondary" onClick={enterEdit} title="Draw a rectangle to focus the heatmap on a specific area, excluding surrounding zones with high idle times that may dominate the visualization.">
+              <button className="btn-small btn-secondary" onClick={enterEdit} title="Draw a rectangle to limit the query to a specific area.">
                 AOI
               </button>
             ) : (
-              <button className="btn-small btn-aoi-save" onClick={saveAoi} title="Apply the selected area and redraw the heatmap using only data within this region.">
-                Save AOI
+              <button className="btn-small btn-aoi-save" onClick={saveAoi} title="Apply the AOI and re-query. Only paths inside this area will be fetched.">
+                Save &amp; Query
               </button>
             )}
             {!isFullImage(aoi) && !aoiEditing && (
-              <button className="btn-small btn-secondary" onClick={resetAoi} title="Remove the area filter and show the heatmap for the entire camera view.">
+              <button className="btn-small btn-secondary" onClick={resetAoi} title="Remove the AOI filter and re-query all data.">
                 Reset
               </button>
             )}
@@ -425,16 +464,18 @@ function DwellHeatmap({ pathData, backgroundImage, loading }) {
         </div>
       </div>
 
-      {/* Colour legend */}
+      {/* ---- Legend ---- */}
       <div className="dwell-legend">
-        <span className="legend-label">Low</span>
-        <div className="gradient-bar"></div>
-        <span className="legend-label">High dwell</span>
+        <div className="legend-swatch" />
+        <span className="legend-label">
+          Idle zone — larger area = more points idling ≥ {fmtTime(idleThreshold)}
+        </span>
       </div>
 
+      {/* ---- Canvas ---- */}
       <div className="canvas-container" ref={containerRef}>
-        {loading && <div className="loading">Loading...</div>}
-        {!imageLoaded && !loading && <div className="loading">Loading camera view...</div>}
+        {loading && <div className="loading">Loading…</div>}
+        {!imageLoaded && !loading && <div className="loading">Loading camera view…</div>}
         <div className="canvas-wrapper">
           <canvas
             ref={canvasRef}

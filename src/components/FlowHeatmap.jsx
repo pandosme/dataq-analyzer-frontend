@@ -142,6 +142,7 @@ function FlowHeatmap({ pathData, backgroundImage, loading }) {
       Head: '#FFD700',          // Gold
       Animal: '#7FFF00',        // Chartreuse
       Vehicle: '#00FFFF',       // Cyan (Aqua)
+      Undefined: '#A0A0A0',    // Gray
       Other: '#FF0000',         // Red
     };
     return colors[className] || '#FF0000'; // Red for unknown

@@ -159,6 +159,20 @@ export const pathsAPI = {
       mongoQuery.maxIdle = { $gte: parseFloat(filters.minIdle) };
     }
 
+    // OPTIONAL: AOI bounding box (bx/by are 0-1000 normalized)
+    // aoi = { x1, y1, x2, y2 } in 0-1 normalized coords
+    if (filters.aoi) {
+      const a = filters.aoi;
+      const x1 = Math.round(Math.min(a.x1, a.x2) * 1000);
+      const x2 = Math.round(Math.max(a.x1, a.x2) * 1000);
+      const y1 = Math.round(Math.min(a.y1, a.y2) * 1000);
+      const y2 = Math.round(Math.max(a.y1, a.y2) * 1000);
+      if (x1 > 5 || y1 > 5 || x2 < 995 || y2 < 995) {
+        mongoQuery.bx = { $gte: x1, $lte: x2 };
+        mongoQuery.by = { $gte: y1, $lte: y2 };
+      }
+    }
+
     // OPTIONAL: minAge (age >= minAge)
     // Skip when 0: $gte:0 is a no-op that excludes documents missing the field
     if (filters.minAge !== undefined && filters.minAge !== null && filters.minAge !== '' && parseFloat(filters.minAge) > 0) {
