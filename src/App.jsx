@@ -206,7 +206,7 @@ function App() {
         </div>
         <div className="panel-section">
           <h3>Filters</h3>
-          <FilterPanel onFilterChange={handleFilterChange} />
+          <FilterPanel onFilterChange={handleFilterChange} cameraDetails={cameraDetails} />
         </div>
       </div>
     );
@@ -341,6 +341,7 @@ function App() {
             onCameraChange={handleCameraChange}
             onQuery={loadPathData}
             loading={loading}
+            cameraDetails={cameraDetails}
           />
         )}
 

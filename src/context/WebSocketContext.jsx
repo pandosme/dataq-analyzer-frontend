@@ -97,7 +97,7 @@ export function WebSocketProvider({ children }) {
 
   // Connect to WebSocket
   const connect = useCallback(() => {
-    if (!isAuthenticated || !token || !server?.url) {
+    if (!isAuthenticated || !token || server == null) {
       if (import.meta.env.DEV) {
         console.log('Not connecting WebSocket: not authenticated or no server');
       }
@@ -238,7 +238,7 @@ export function WebSocketProvider({ children }) {
 
   // Connect when authenticated, disconnect when not
   useEffect(() => {
-    if (isAuthenticated && token && server?.url) {
+    if (isAuthenticated && token && server != null) {
       connect();
     } else {
       disconnect();
@@ -247,7 +247,7 @@ export function WebSocketProvider({ children }) {
     return () => {
       disconnect();
     };
-  }, [isAuthenticated, token, server?.url, connect, disconnect]);
+  }, [isAuthenticated, token, server, connect, disconnect]);
 
   // Ping interval to keep connection alive
   useEffect(() => {

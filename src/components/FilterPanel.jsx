@@ -16,7 +16,7 @@ const TIME_RANGES = [
   { label: 'Last Month', hours: 720 },
 ];
 
-function FilterPanel({ onFilterChange }) {
+function FilterPanel({ onFilterChange, cameraDetails }) {
   const [timeMode, setTimeMode] = useState('preset'); // 'preset' or 'custom'
   const [selectedRange, setSelectedRange] = useState('24'); // hours
   const [filters, setFilters] = useState({
@@ -162,18 +162,9 @@ function FilterPanel({ onFilterChange }) {
           onChange={(e) => handleChange('class', e.target.value)}
         >
           <option value="">All</option>
-          <option value="Human">Human</option>
-          <option value="Car">Car</option>
-          <option value="Truck">Truck</option>
-          <option value="Bus">Bus</option>
-          <option value="Bike">Bike</option>
-          <option value="LicensePlate">LicensePlate</option>
-          <option value="Head">Head</option>
-          <option value="Bag">Bag</option>
-          <option value="Vehicle">Vehicle</option>
-          <option value="Animal">Animal</option>
-          <option value="Undefined">Undefined</option>
-          <option value="Other">Other</option>
+          {(cameraDetails?.labels || ['Human', 'Vehicle', 'Bike', 'LicensePlate', 'Bag', 'Head', 'Animal', 'Car', 'Truck', 'Bus', 'Other']).map((label) => (
+            <option key={label} value={label}>{label}</option>
+          ))}
         </select>
       </div>
 

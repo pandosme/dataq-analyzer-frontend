@@ -8,13 +8,15 @@ import CameraSelector from './CameraSelector';
 import ThreeColumnLayout from './ThreeColumnLayout';
 import './LiveData.css';
 
+const DEFAULT_LABELS = ['Human', 'Vehicle', 'Bike', 'LicensePlate', 'Bag', 'Head', 'Animal', 'Car', 'Truck', 'Bus', 'Other'];
+
 function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
   const { dateFormat, timeFormat } = useUserPreferences();
   const { isConnected, connectionError, subscribe, onPathEvent } = useWebSocket();
   const [recentPaths, setRecentPaths] = useState([]);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
-    objectTypes: ['Human', 'Car', 'Truck', 'Bus', 'Bike', 'LicensePlate', 'Head', 'Bag', 'Vehicle', 'Animal', 'Undefined', 'Other'],
+    objectTypes: DEFAULT_LABELS,
     minDistance: 20,
     minAge: 2,
   });
@@ -25,11 +27,12 @@ function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
 
   // Load camera filters when camera changes
   useEffect(() => {
-    if (!cameraDetails?.filters) return;
+    if (!cameraDetails) return;
+    const availableLabels = cameraDetails.labels || DEFAULT_LABELS;
     setFilters({
-      objectTypes: cameraDetails.filters.objectTypes || ['Human', 'Car', 'Truck', 'Bus', 'Bike', 'LicensePlate', 'Head', 'Bag', 'Vehicle', 'Animal', 'Undefined', 'Other'],
-      minDistance: cameraDetails.filters.minDistance !== undefined ? cameraDetails.filters.minDistance : 20,
-      minAge: cameraDetails.filters.minAge !== undefined ? cameraDetails.filters.minAge : 2,
+      objectTypes: cameraDetails.filters?.objectTypes || availableLabels,
+      minDistance: cameraDetails.filters?.minDistance !== undefined ? cameraDetails.filters.minDistance : 20,
+      minAge: cameraDetails.filters?.minAge !== undefined ? cameraDetails.filters.minAge : 2,
     });
   }, [cameraDetails]);
 
@@ -397,108 +400,16 @@ function LiveData({ selectedCamera, cameraDetails, onCameraChange }) {
           <div className="filter-group">
             <label>Object Types</label>
             <div className="checkbox-grid">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Human')}
-                  onChange={() => handleObjectTypeChange('Human')}
-                />
-                <span>Human</span>
-              </label>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Car')}
-                  onChange={() => handleObjectTypeChange('Car')}
-                />
-                <span>Car</span>
-              </label>
-
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Truck')}
-                  onChange={() => handleObjectTypeChange('Truck')}
-                />
-                <span>Truck</span>
-              </label>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Bus')}
-                  onChange={() => handleObjectTypeChange('Bus')}
-                />
-                <span>Bus</span>
-              </label>
-
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Bike')}
-                  onChange={() => handleObjectTypeChange('Bike')}
-                />
-                <span>Bike</span>
-              </label>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('LicensePlate')}
-                  onChange={() => handleObjectTypeChange('LicensePlate')}
-                />
-                <span>LicensePlate</span>
-              </label>
-
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Head')}
-                  onChange={() => handleObjectTypeChange('Head')}
-                />
-                <span>Head</span>
-              </label>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Bag')}
-                  onChange={() => handleObjectTypeChange('Bag')}
-                />
-                <span>Bag</span>
-              </label>
-
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Vehicle')}
-                  onChange={() => handleObjectTypeChange('Vehicle')}
-                />
-                <span>Vehicle</span>
-              </label>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Animal')}
-                  onChange={() => handleObjectTypeChange('Animal')}
-                />
-                <span>Animal</span>
-              </label>
-
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Undefined')}
-                  onChange={() => handleObjectTypeChange('Undefined')}
-                />
-                <span>Undefined</span>
-              </label>
-
-              <label className="checkbox-label checkbox-single">
-                <input
-                  type="checkbox"
-                  checked={filters.objectTypes.includes('Other')}
-                  onChange={() => handleObjectTypeChange('Other')}
-                />
-                <span>Other</span>
-              </label>
+              {(cameraDetails?.labels || DEFAULT_LABELS).map((label) => (
+                <label key={label} className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={filters.objectTypes.includes(label)}
+                    onChange={() => handleObjectTypeChange(label)}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
             </div>
           </div>
 

@@ -11,11 +11,11 @@ export default defineConfig({
     proxy: {
       // Proxy API and WebSocket requests to the dev backend (mirrors Docker/nginx behaviour)
       '/api': {
-        target: 'http://dart.internal:3303',
+        target: 'http://localhost:3303',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://dart.internal:3303',
+        target: 'ws://localhost:3303',
         ws: true,
         changeOrigin: true,
       },

@@ -305,6 +305,11 @@ function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onErr
         if (postTime !== undefined) request.postTime = postTime;
         if (age !== undefined) request.age = age;
 
+        // Pass API key to backend so it can authenticate with the recording server.
+        // Sourced from VITE_API_KEY env var (temporary until backend serves it via system config).
+        const envApiKey = import.meta.env.VITE_API_KEY;
+        if (envApiKey) request.apiKey = envApiKey;
+
         if (import.meta.env.DEV) {
           console.log('WebSocketVideoPlayer: Requesting video with timing:', {
             timestamp,
@@ -347,6 +352,14 @@ function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onErr
           console.log('WebSocketVideoPlayer: Disconnected');
         }
         cleanup();
+        // If we closed while still loading (no metadata/error received), surface an error
+        setLoading(prev => {
+          if (prev) {
+            setError('Video stream closed before data was received');
+            if (onError) onError('Video stream closed before data was received');
+          }
+          return false;
+        });
       };
     };
 

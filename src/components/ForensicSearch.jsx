@@ -6,7 +6,24 @@ import CameraSelector from './CameraSelector';
 import WebSocketVideoPlayer from './WebSocketVideoPlayer';
 import './ForensicSearch.css';
 
-function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraChange, onQuery, loading }) {
+const COLOR_NAME_MAP = {
+  White: '#ffffff',
+  Black: '#1a1a1a',
+  Red: '#e53935',
+  Blue: '#1e88e5',
+  Green: '#43a047',
+  Yellow: '#fdd835',
+  Beige: '#d7ccc8',
+  Orange: '#fb8c00',
+  Purple: '#8e24aa',
+  Silver: '#bdbdbd',
+  Grey: '#757575',
+  Gray: '#757575',
+  Brown: '#6d4c41',
+  Pink: '#e91e63',
+};
+
+function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraChange, onQuery, loading, cameraDetails }) {
   const { dateFormat, timeFormat, videoPreTime, videoPostTime } = useUserPreferences();
   const canvasRef = useRef(null);
   const imageRef = useRef(null);
@@ -31,7 +48,8 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
     timeRange: '24hours', // time period selection
     direction: '',
     minDwell: 0,
-    color1: '',
+    color: '',
+    color2: '',
     minAge: 0,
     anomalyOnly: false,
   });
@@ -201,8 +219,11 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
     if (filters.minDwell > 0 && (!pathEvent.dwell || pathEvent.dwell < filters.minDwell))
       return false;
 
-    // Color1 filter
-    if (filters.color1 && pathEvent.color1 !== filters.color1) return false;
+    // Color filter
+    if (filters.color && pathEvent.color !== filters.color) return false;
+
+    // Color2 filter
+    if (filters.color2 && pathEvent.color2 !== filters.color2) return false;
 
     // Min age filter
     if (filters.minAge > 0 && (!pathEvent.age || pathEvent.age < filters.minAge)) return false;
@@ -731,26 +752,17 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
                 onChange={(e) => setFilters({ ...filters, class: e.target.value })}
               >
                 <option value="">All</option>
-                <option value="Human">Human</option>
-                <option value="Car">Car</option>
-                <option value="Truck">Truck</option>
-                <option value="Bus">Bus</option>
-                <option value="Bike">Bike</option>
-                <option value="LicensePlate">LicensePlate</option>
-                <option value="Head">Head</option>
-                <option value="Bag">Bag</option>
-                <option value="Vehicle">Vehicle</option>
-                <option value="Animal">Animal</option>
-                <option value="Undefined">Undefined</option>
-                <option value="Other">Other</option>
+                {(cameraDetails?.labels || ['Human', 'Vehicle', 'Bike', 'LicensePlate', 'Bag', 'Head', 'Animal', 'Car', 'Truck', 'Bus', 'Other']).map((label) => (
+                  <option key={label} value={label}>{label}</option>
+                ))}
               </select>
             </div>
 
             <div className="filter-group">
-              <label>Color 1</label>
+              <label>Color</label>
               <select
-                value={filters.color1}
-                onChange={(e) => setFilters({ ...filters, color1: e.target.value })}
+                value={filters.color}
+                onChange={(e) => setFilters({ ...filters, color: e.target.value })}
               >
                 <option value="">All</option>
                 <option value="White">White</option>
@@ -760,6 +772,31 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
                 <option value="Green">Green</option>
                 <option value="Yellow">Yellow</option>
                 <option value="Beige">Beige</option>
+                <option value="Gray">Gray</option>
+                <option value="Silver">Silver</option>
+                <option value="Orange">Orange</option>
+                <option value="Brown">Brown</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label>Color 2</label>
+              <select
+                value={filters.color2}
+                onChange={(e) => setFilters({ ...filters, color2: e.target.value })}
+              >
+                <option value="">All</option>
+                <option value="White">White</option>
+                <option value="Black">Black</option>
+                <option value="Red">Red</option>
+                <option value="Blue">Blue</option>
+                <option value="Green">Green</option>
+                <option value="Yellow">Yellow</option>
+                <option value="Beige">Beige</option>
+                <option value="Gray">Gray</option>
+                <option value="Silver">Silver</option>
+                <option value="Orange">Orange</option>
+                <option value="Brown">Brown</option>
               </select>
             </div>
           </div>
@@ -966,7 +1003,31 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
                       {pathEvent.class}
                     </span>
                   </td>
-                  <td>{pathEvent.color1 || '-'}</td>
+                  <td>
+                    <span className="color-swatch-cell">
+                      {pathEvent.color ? (
+                        <>
+                          <span
+                            className="color-dot"
+                            style={{ background: COLOR_NAME_MAP[pathEvent.color] || pathEvent.color }}
+                            title={pathEvent.color}
+                          />
+                          <span>{pathEvent.color}</span>
+                        </>
+                      ) : null}
+                      {pathEvent.color2 ? (
+                        <>
+                          <span
+                            className="color-dot"
+                            style={{ background: COLOR_NAME_MAP[pathEvent.color2] || pathEvent.color2 }}
+                            title={pathEvent.color2}
+                          />
+                          <span>{pathEvent.color2}</span>
+                        </>
+                      ) : null}
+                      {!pathEvent.color && !pathEvent.color2 ? '-' : null}
+                    </span>
+                  </td>
                   <td>{pathEvent.age?.toFixed(1) || 'N/A'}</td>
                   <td className="anomaly-cell">{pathEvent.anomaly || '-'}</td>
                 </tr>

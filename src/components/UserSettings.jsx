@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useUserPreferences } from '../context/UserPreferencesContext';
+import { useAuth } from '../context/AuthContext';
+import { configAPI } from '../services/api';
 import './UserSettings.css';
 
 function UserSettings({ onClose }) {
@@ -14,6 +16,7 @@ function UserSettings({ onClose }) {
     userPreferences,
     updatePreferences,
   } = useUserPreferences();
+  const { isAdmin } = useAuth();
 
   const [formData, setFormData] = useState({
     dateFormat: '',
@@ -22,6 +25,19 @@ function UserSettings({ onClose }) {
     videoPreTime: '',
     videoPostTime: '',
   });
+
+  // Admin-only: Video server system config
+  const [serverConfig, setServerConfig] = useState({
+    type: 'VideoX',
+    serverUrl: '',
+    apiKey: '',
+    preTime: 5,
+    postTime: 10,
+    enabled: false,
+  });
+  const [serverSaving, setServerSaving] = useState(false);
+  const [serverSaved, setServerSaved] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -36,6 +52,55 @@ function UserSettings({ onClose }) {
       videoPostTime: userPreferences.videoPlayback?.postTime?.toString() || '',
     });
   }, [userPreferences]);
+
+  // Load full playback config for admin
+  useEffect(() => {
+    if (!isAdmin()) return;
+    configAPI.getSystemConfig().then(res => {
+      const pc = res?.playbackConfig;
+      if (pc) {
+        setServerConfig({
+          type: pc.enabled === false ? 'Disabled' : (pc.type || 'VideoX'),
+          serverUrl: pc.serverUrl || '',
+          apiKey: pc.apiKey || '',
+          preTime: pc.preTime ?? 5,
+          postTime: pc.postTime ?? 10,
+          enabled: pc.enabled !== false,
+        });
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleServerChange = (field, value) => {
+    setServerConfig(prev => ({ ...prev, [field]: value }));
+    setServerSaved(false);
+    setServerError('');
+  };
+
+  const handleServerSave = async () => {
+    setServerSaving(true);
+    setServerError('');
+    try {
+      const payload = {
+        playbackConfig: {
+          type: serverConfig.type === 'Disabled' ? 'VideoX' : serverConfig.type,
+          enabled: serverConfig.type !== 'Disabled',
+          serverUrl: serverConfig.serverUrl,
+          apiKey: serverConfig.apiKey,
+          preTime: Number(serverConfig.preTime) || 5,
+          postTime: Number(serverConfig.postTime) || 10,
+        },
+      };
+      await configAPI.updateSystemConfig(payload);
+      setServerSaved(true);
+      setTimeout(() => setServerSaved(false), 3000);
+    } catch (err) {
+      setServerError(err.message || 'Failed to save server config');
+    } finally {
+      setServerSaving(false);
+    }
+  };
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -202,6 +267,79 @@ function UserSettings({ onClose }) {
             </div>
           </div>
         </div>
+
+        {/* Admin-only: Video Server Configuration */}
+        {isAdmin() && (
+          <div className="settings-section">
+            <h3>Video Server (Admin)</h3>
+
+            <div className="setting-item">
+              <label>Recording Server Type</label>
+              <select
+                value={serverConfig.type}
+                onChange={(e) => handleServerChange('type', e.target.value)}
+              >
+                <option value="Disabled">Disabled</option>
+                <option value="VideoX">VideoX</option>
+                <option value="Milestone">Milestone</option>
+                <option value="ACS">Axis Camera Station</option>
+              </select>
+            </div>
+
+            {serverConfig.type !== 'Disabled' && (
+              <>
+                <div className="setting-item">
+                  <label>Server URL</label>
+                  <input
+                    type="text"
+                    value={serverConfig.serverUrl}
+                    onChange={(e) => handleServerChange('serverUrl', e.target.value)}
+                    placeholder="e.g. http://videox.internal"
+                    style={{ width: '100%', fontFamily: 'monospace' }}
+                  />
+                </div>
+
+                <div className="setting-item">
+                  <label>API Key</label>
+                  <input
+                    type="password"
+                    value={serverConfig.apiKey}
+                    onChange={(e) => handleServerChange('apiKey', e.target.value)}
+                    placeholder="Paste API key here"
+                    style={{ width: '100%', fontFamily: 'monospace' }}
+                  />
+                </div>
+
+                <div className="setting-item">
+                  <label>Default Pre-roll (seconds)</label>
+                  <input
+                    type="number" min="0" max="120"
+                    value={serverConfig.preTime}
+                    onChange={(e) => handleServerChange('preTime', e.target.value)}
+                  />
+                </div>
+
+                <div className="setting-item">
+                  <label>Default Post-roll (seconds)</label>
+                  <input
+                    type="number" min="0" max="120"
+                    value={serverConfig.postTime}
+                    onChange={(e) => handleServerChange('postTime', e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {serverError && <p style={{ color: 'red', margin: '0.5rem 0' }}>{serverError}</p>}
+
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.75rem' }}>
+              {serverSaved && <span className="saved-indicator">✓ Saved</span>}
+              <button className="btn-primary" onClick={handleServerSave} disabled={serverSaving}>
+                {serverSaving ? 'Saving...' : 'Save Server Config'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="modal-footer">
           <button className="btn-secondary" onClick={handleReset}>

@@ -202,9 +202,9 @@ export const pathsAPI = {
       }
     }
 
-    // OPTIONAL: color1 (exact match, null/empty means all)
-    if (filters.color1) {
-      mongoQuery.color1 = filters.color1;
+    // OPTIONAL: color (exact match, null/empty means all)
+    if (filters.color) {
+      mongoQuery.color = filters.color;
     }
 
     // OPTIONAL: color2 (exact match, null/empty means all)

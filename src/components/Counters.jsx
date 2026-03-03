@@ -365,6 +365,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
   const [zones, setZones]                 = useState(initialSet.zones.map(z => ({ ...z, rect: { ...z.rect } })));
   const [objectClasses, setObjectClasses] = useState([...(initialSet.objectClasses || [])]);
   const [counters, setCounters]           = useState([]);
+  const [mqttEnabled, setMqttEnabled]     = useState(!!(initialSet.mqtt?.enabled || initialSet.mqtt?.topic));
   const [mqttTopic, setMqttTopic]         = useState(initialSet.mqtt?.topic || '');
   const [mqttInterval, setMqttInterval]   = useState(initialSet.mqtt?.intervalSeconds || 60);
   const [snapshot, setSnapshot]           = useState(null);
@@ -375,6 +376,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
   const [deleting, setDeleting]           = useState(false);
   const [saved, setSaved]                 = useState(false);
   const [dirty, setDirty]                = useState(false);
+  const [cameraLabels, setCameraLabels]  = useState(ALL_CLASSES);
   const pollRef    = useRef(null);
   const initialRef = useRef(initialSet);
 
@@ -383,6 +385,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
     const init = initialRef.current;
     const changed =
       name !== init.name ||
+      mqttEnabled !== !!(init.mqtt?.enabled || init.mqtt?.topic) ||
       mqttTopic !== (init.mqtt?.topic || '') ||
       mqttInterval !== (init.mqtt?.intervalSeconds || 60) ||
       JSON.stringify(objectClasses.sort()) !== JSON.stringify([...(init.objectClasses || [])].sort()) ||
@@ -391,7 +394,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
       JSON.stringify(counters.map(c => ({ id: c.id, name: c.name, enabled: c.enabled }))) !==
         JSON.stringify((init.counters || []).map(c => ({ id: c.id, name: c.name, enabled: c.enabled })));
     setDirty(changed);
-  }, [name, zones, objectClasses, counters, mqttTopic, mqttInterval]);
+  }, [name, zones, objectClasses, counters, mqttEnabled, mqttTopic, mqttInterval]);
 
   // Robust snapshot loader
   const toDataUrl = (raw) => {
@@ -420,6 +423,15 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
       } catch {} // eslint-disable-line no-empty
     })();
     return () => { cancelled = true; };
+  }, [set.serial]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load camera-specific labels
+  useEffect(() => {
+    camerasAPI.getAll().then(res => {
+      const cameras = res?.data || res || [];
+      const cam = (Array.isArray(cameras) ? cameras : []).find(c => c.serialNumber === set.serial);
+      if (cam?.labels?.length) setCameraLabels(cam.labels);
+    }).catch(() => {});
   }, [set.serial]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load paths on demand when toggle is enabled
@@ -474,6 +486,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
             setName(updated.name);
             setZones(updated.zones.map(z => ({ ...z, rect: { ...z.rect } })));
             setObjectClasses([...(updated.objectClasses || [])]);
+            setMqttEnabled(!!(updated.mqtt?.enabled || updated.mqtt?.topic));
             setMqttTopic(updated.mqtt?.topic || '');
             setMqttInterval(updated.mqtt?.intervalSeconds || 60);
             onChanged(updated);
@@ -496,7 +509,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
       zones,
       objectClasses,
       counters: counters.map(c => ({ id: c.id, name: c.name, enabled: c.enabled })),
-      mqtt: { enabled: !!mqttTopic, topic: mqttTopic, intervalSeconds: mqttInterval },
+      mqtt: { enabled: mqttEnabled && !!mqttTopic, topic: mqttTopic, intervalSeconds: mqttInterval },
       recount: classesChanged,
     });
     if (updated) {
@@ -601,7 +614,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
           <div className="detail-settings-group">
             <label className="field-label">Object Classes</label>
             <div className="class-checkboxes">
-              {ALL_CLASSES.map(cls => (
+              {cameraLabels.map(cls => (
                 <label key={cls} className="class-check">
                   <input type="checkbox" checked={objectClasses.includes(cls)} disabled={readOnly}
                     onChange={e => setObjectClasses(prev => e.target.checked ? [...prev, cls] : prev.filter(c => c !== cls))} />
@@ -615,17 +628,26 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
           {/* MQTT Publishing */}
           <div className="detail-settings-group">
             <label className="field-label">MQTT Publishing</label>
-            <div className="field-group">
-              <label className="field-sublabel">Topic</label>
-              <input type="text" className="text-input" value={mqttTopic} placeholder="e.g. dataq/counters/my-counter"
-                readOnly={readOnly} onChange={e => setMqttTopic(e.target.value)} />
-            </div>
-            <div className="field-group">
-              <label className="field-sublabel">Interval (seconds)</label>
-              <input type="number" className="text-input" min="60" max="3600" value={mqttInterval}
-                readOnly={readOnly} onChange={e => setMqttInterval(Number(e.target.value) || 60)} />
-              <p className="hint">60 – 3600 seconds</p>
-            </div>
+            <label className="class-check">
+              <input type="checkbox" checked={mqttEnabled} disabled={readOnly}
+                onChange={e => setMqttEnabled(e.target.checked)} />
+              {' '}Enable MQTT output
+            </label>
+            {mqttEnabled && (
+              <>
+                <div className="field-group">
+                  <label className="field-sublabel">Topic</label>
+                  <input type="text" className="text-input" value={mqttTopic} placeholder="e.g. dataq/counters/my-counter"
+                    readOnly={readOnly} onChange={e => setMqttTopic(e.target.value)} />
+                </div>
+                <div className="field-group">
+                  <label className="field-sublabel">Interval (seconds)</label>
+                  <input type="number" className="text-input" min="60" max="3600" value={mqttInterval}
+                    readOnly={readOnly} onChange={e => setMqttInterval(Number(e.target.value) || 60)} />
+                  <p className="hint">60 – 3600 seconds</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -770,6 +792,7 @@ function CounterCreate({ onSave, onCancel }) {
   const [pairs, setPairs]             = useState([]);
   const [mqtt, setMqtt]               = useState({ enabled: false, intervalSeconds: 300, topic: '' });
   const [saving, setSaving]           = useState(false);
+  const [cameraLabels, setCameraLabels] = useState(ALL_CLASSES);
 
   // Load snapshot + recent paths when camera selected
   useEffect(() => {
@@ -807,6 +830,8 @@ function CounterCreate({ onSave, onCancel }) {
 
       setSnapshot(img);
       setLoadingSnap(false);
+      const cam = (camerasResp?.data || []).find(c => c.serialNumber === camera);
+      if (cam?.labels?.length) setCameraLabels(cam.labels);
     });
   }, [camera]);
 
@@ -937,7 +962,7 @@ function CounterCreate({ onSave, onCancel }) {
             <div className="field-group">
               <label className="field-label">Object Classes to Count</label>
               <div className="class-checkboxes">
-                {ALL_CLASSES.map(cls => (
+                {cameraLabels.map(cls => (
                   <label key={cls} className="class-check">
                     <input type="checkbox" checked={objectClasses.includes(cls)}
                       onChange={e => setObjCls(prev => e.target.checked ? [...prev, cls] : prev.filter(c => c !== cls))} />
