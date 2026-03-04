@@ -23,7 +23,7 @@ function FilterPanel({ onFilterChange, cameraDetails }) {
     from: format(new Date(Date.now() - 24 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
     to: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     class: '',
-    minIdle: '0',
+    minDwell: '0',
     limit: '500',
   });
 
@@ -51,7 +51,7 @@ function FilterPanel({ onFilterChange, cameraDetails }) {
       from: filters.from ? new Date(filters.from).toISOString() : undefined,
       to: filters.to ? new Date(filters.to).toISOString() : undefined,
       class: filters.class || undefined,
-      minIdle: filters.minIdle ? parseFloat(filters.minIdle) : undefined,
+      minDwell: filters.minDwell ? parseFloat(filters.minDwell) : undefined,
       limit: filters.limit ? parseInt(filters.limit) : 500,
     };
     onFilterChange(apiFilters);
@@ -64,14 +64,14 @@ function FilterPanel({ onFilterChange, cameraDetails }) {
       from: format(new Date(Date.now() - 24 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
       to: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       class: '',
-      minIdle: '0',
+      minDwell: '0',
       limit: '500',
     };
     setFilters(defaultFilters);
     onFilterChange({
       from: new Date(defaultFilters.from).toISOString(),
       to: new Date(defaultFilters.to).toISOString(),
-      minIdle: 0,
+      minDwell: 0,
       limit: 500,
     });
   };
@@ -139,14 +139,14 @@ function FilterPanel({ onFilterChange, cameraDetails }) {
         </>
       )}
 
-      {/* Min Idle Filter */}
+      {/* Min Dwell Filter */}
       <div className="filter-group">
-        <label htmlFor="filter-min-idle">Min Idle Time (seconds):</label>
+        <label htmlFor="filter-min-dwell">Min Dwell Time (seconds):</label>
         <input
-          id="filter-min-idle"
+          id="filter-min-dwell"
           type="number"
-          value={filters.minIdle}
-          onChange={(e) => handleChange('minIdle', e.target.value)}
+          value={filters.minDwell}
+          onChange={(e) => handleChange('minDwell', e.target.value)}
           placeholder="5"
           min="0"
           step="1"

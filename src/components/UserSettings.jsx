@@ -57,7 +57,7 @@ function UserSettings({ onClose }) {
   useEffect(() => {
     if (!isAdmin()) return;
     configAPI.getSystemConfig().then(res => {
-      const pc = res?.playbackConfig;
+      const pc = res?.data?.playback;
       if (pc) {
         setServerConfig({
           type: pc.enabled === false ? 'Disabled' : (pc.type || 'VideoX'),
@@ -83,7 +83,7 @@ function UserSettings({ onClose }) {
     setServerError('');
     try {
       const payload = {
-        playbackConfig: {
+        playback: {
           type: serverConfig.type === 'Disabled' ? 'VideoX' : serverConfig.type,
           enabled: serverConfig.type !== 'Disabled',
           serverUrl: serverConfig.serverUrl,

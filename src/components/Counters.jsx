@@ -379,6 +379,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
   const [cameraLabels, setCameraLabels]  = useState(ALL_CLASSES);
   const pollRef    = useRef(null);
   const initialRef = useRef(initialSet);
+  const [saveError, setSaveError] = useState(null);
 
   // Track changes for dirty state
   useEffect(() => {
@@ -500,55 +501,84 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
   const handleSave = async () => {
     if (zones.length < 2 || objectClasses.length === 0) return;
     setBusy(true);
-    // Detect if object classes changed → needs recount
-    const origClasses = [...(initialRef.current.objectClasses || [])].sort().join(',');
-    const currClasses = [...objectClasses].sort().join(',');
-    const classesChanged = origClasses !== currClasses;
-    const updated = await countersAPI.update(set._id, {
-      name,
-      zones,
-      objectClasses,
-      counters: counters.map(c => ({ id: c.id, name: c.name, enabled: c.enabled })),
-      mqtt: { enabled: mqttEnabled && !!mqttTopic, topic: mqttTopic, intervalSeconds: mqttInterval },
-      recount: classesChanged,
-    });
-    if (updated) {
-      setSet(updated);
-      setBackfill(updated.backfill);
-      initialRef.current = updated;
-      setDirty(false);
-      onChanged(updated);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+    setSaveError(null);
+    try {
+      // Detect if object classes changed → needs recount
+      const origClasses = [...(initialRef.current.objectClasses || [])].sort().join(',');
+      const currClasses = [...objectClasses].sort().join(',');
+      const classesChanged = origClasses !== currClasses;
+      const updated = await countersAPI.update(set._id, {
+        name,
+        zones,
+        objectClasses,
+        counters: counters.map(c => ({ id: c.id, name: c.name, enabled: c.enabled })),
+        mqtt: { enabled: mqttEnabled && !!mqttTopic, topic: mqttTopic, intervalSeconds: mqttInterval },
+        recount: classesChanged,
+      });
+      if (updated) {
+        setSet(updated);
+        setBackfill(updated.backfill);
+        initialRef.current = updated;
+        setDirty(false);
+        onChanged(updated);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch (err) {
+      setSaveError(err?.response?.data?.error || err.message || 'Save failed');
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this Counter Set? This cannot be undone.')) return;
     setDeleting(true);
-    await countersAPI.delete(set._id);
-    setDeleting(false);
-    onDelete(set._id);
+    setSaveError(null);
+    try {
+      await countersAPI.delete(set._id);
+      onDelete(set._id);
+    } catch (err) {
+      setSaveError(err?.response?.data?.error || err.message || 'Delete failed');
+      setDeleting(false);
+    }
   };
 
   const handleReset = async () => {
     if (!window.confirm('Reset all counters to 0? This only clears current counts.')) return;
     setBusy(true);
-    const updated = await countersAPI.resetAll(set._id);
-    if (updated) {
-      setSet(updated);
-      onChanged(updated);
+    setSaveError(null);
+    try {
+      const updated = await countersAPI.resetAll(set._id);
+      if (updated) {
+        setSet(updated);
+        initialRef.current = updated;
+        // Refresh the displayed counter rows with the reset values (value=0, classes={})
+        setCounters(prev => prev.map(c => {
+          const fresh = (updated.counters || []).find(u => u.id === c.id);
+          return fresh ? { ...c, value: fresh.value ?? 0, classes: fresh.classes ?? {} } : { ...c, value: 0, classes: {} };
+        }));
+        onChanged(updated);
+      }
+    } catch (err) {
+      setSaveError(err?.response?.data?.error || err.message || 'Reset failed');
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   const handleBackfill = async () => {
     if (!window.confirm('Backfill will reset all counters and recount from historical path data. Continue?')) return;
     setBusy(true);
-    const bf = await countersAPI.startBackfill(set._id);
-    if (bf) setBackfill(bf);
-    setBusy(false);
+    setSaveError(null);
+    try {
+      const bf = await countersAPI.startBackfill(set._id);
+      if (bf) setBackfill(bf);
+    } catch (err) {
+      setSaveError(err?.response?.data?.error || err.message || 'Backfill failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const removeZone = (idx) => {
@@ -563,7 +593,8 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
         <button className="btn-secondary btn-small" onClick={onBack}>← Back</button>
         <h2>{readOnly ? name : <input className="name-input" value={name} onChange={e => setName(e.target.value)} />}</h2>
         <div className="detail-actions">
-          {!readOnly && saved && <span className="saved-indicator">✓ Saved</span>}
+          {saveError && <span className="save-error-indicator" title={saveError}>⚠ Error: {saveError}</span>}
+        {!readOnly && saved && <span className="saved-indicator">✓ Saved</span>}
           {!readOnly && <button className="btn-warning btn-small" onClick={handleReset} disabled={busy}>Reset Counters</button>}
           {!readOnly && <button className="btn-info btn-small" onClick={handleBackfill} disabled={busy || backfill?.status === 'running'}>Backfill</button>}
           {!readOnly && <button className={`btn-save${dirty ? ' btn-save-dirty' : ''}`} onClick={handleSave} disabled={busy || !dirty || zones.length < 2 || objectClasses.length === 0}>
@@ -876,18 +907,25 @@ function CounterCreate({ onSave, onCancel }) {
     return true;
   };
 
+  const [createError, setCreateError] = useState(null);
+
   const handleSave = async () => {
     setSaving(true);
-    const result = await countersAPI.create({
-      name: setName,
-      serial: camera,
-      objectClasses,
-      zones,
-      counters: pairs,
-      mqtt: mqtt.enabled ? mqtt : { ...mqtt, enabled: false },
-    });
-    onSave(result);
-    setSaving(false);
+    setCreateError(null);
+    try {
+      const result = await countersAPI.create({
+        name: setName,
+        serial: camera,
+        objectClasses,
+        zones,
+        counters: pairs,
+        mqtt: mqtt.enabled ? mqtt : { ...mqtt, enabled: false },
+      });
+      onSave(result);
+    } catch (err) {
+      setCreateError(err?.response?.data?.error || err.message || 'Create failed');
+      setSaving(false);
+    }
   };
 
   return (
@@ -1040,6 +1078,9 @@ function CounterCreate({ onSave, onCancel }) {
         </div>
       )}
 
+      {createError && (
+        <div className="save-error-banner">⚠ {createError}</div>
+      )}
       {/* Wizard navigation */}
       <div className="wizard-nav">
         {step > 1 && <button className="btn-secondary" onClick={() => setStep(s => s - 1)}>← Back</button>}
