@@ -94,6 +94,19 @@
   color: #fff;
 }
 
+/* Arrow selector in edit mode */
+.arrow-selector {
+  background: rgba(46, 204, 113, 0.15);
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.arrow-selector select {
+  min-width: 100px;
+  font-weight: 500;
+}
+
 /* ─── Canvas Container ─────────────────────────────────────────────────────── */
 .flow-canvas-container {
   position: relative;

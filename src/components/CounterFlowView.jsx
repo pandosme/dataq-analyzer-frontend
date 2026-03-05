@@ -60,6 +60,7 @@ export default function CounterFlowView({
   const [saving, setSaving] = useState(false);
   const [dragging, setDragging] = useState(null); // { counterId, handle: 'start'|'end'|'cp1'|'cp2' }
   const [hoveredHandle, setHoveredHandle] = useState(null);
+  const [selectedArrow, setSelectedArrow] = useState(null); // null = all, or counter id
 
   // Local state for editing (synced from props)
   const [localConfig, setLocalConfig] = useState(flowViewConfig);
@@ -433,10 +434,29 @@ export default function CounterFlowView({
                 }
               }
               setEditMode(!editMode);
+              if (editMode) setSelectedArrow(null); // Reset selection when exiting
             }}
           >
             {saving ? 'Saving...' : editMode ? '✓ Done Editing' : '✎ Edit Arrows'}
           </button>
+        )}
+
+        {/* Arrow selector dropdown (only in edit mode) */}
+        {editMode && (
+          <div className="control-group arrow-selector">
+            <label>Edit:</label>
+            <select
+              value={selectedArrow || ''}
+              onChange={(e) => setSelectedArrow(e.target.value || null)}
+            >
+              <option value="">All Arrows</option>
+              {arrowData.map(arrow => (
+                <option key={arrow.id} value={arrow.id}>
+                  {arrow.counter.from} → {arrow.counter.to}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
 
@@ -490,15 +510,21 @@ export default function CounterFlowView({
           </defs>
 
           {/* Draw arrows */}
-          {arrowData.map(arrow => (
-            <g key={arrow.id} className="arrow-group">
+          {arrowData.map(arrow => {
+            // Dim non-selected arrows when a specific arrow is selected for editing
+            const isSelected = !selectedArrow || selectedArrow === arrow.id;
+            const dimOpacity = editMode && !isSelected ? 0.25 : 1;
+            const arrowOpacity = (localConfig.arrowOpacity || 0.7) * dimOpacity;
+
+            return (
+            <g key={arrow.id} className={`arrow-group ${!isSelected ? 'dimmed' : ''}`}>
               {/* Main path */}
               <path
                 d={getPath(arrow)}
                 fill="none"
                 stroke={localConfig.arrowColor || '#3498db'}
                 strokeWidth={arrow.width}
-                strokeOpacity={localConfig.arrowOpacity || 0.7}
+                strokeOpacity={arrowOpacity}
                 strokeLinecap="round"
                 markerEnd={`url(#arrowhead-${arrow.id})`}
                 className="arrow-path"
@@ -508,7 +534,7 @@ export default function CounterFlowView({
               {(() => {
                 const pos = getLabelPos(arrow);
                 return (
-                  <g className="arrow-label">
+                  <g className="arrow-label" opacity={dimOpacity}>
                     <rect
                       x={pos.x - 25}
                       y={pos.y - 12}
@@ -531,8 +557,8 @@ export default function CounterFlowView({
                 );
               })()}
 
-              {/* Edit handles (only in edit mode) */}
-              {editMode && (
+              {/* Edit handles (only in edit mode and for selected arrow) */}
+              {editMode && isSelected && (
                 <>
                   {/* Start handle (green) */}
                   <circle
@@ -612,7 +638,8 @@ export default function CounterFlowView({
                 </>
               )}
             </g>
-          ))}
+          );
+          })}
         </svg>
       </div>
 
