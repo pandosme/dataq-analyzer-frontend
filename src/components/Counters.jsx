@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import CameraSelector from './CameraSelector';
+import CounterFlowView from './CounterFlowView';
 import { camerasAPI, pathsAPI, countersAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import './Counters.css';
@@ -372,6 +373,12 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
   const [paths, setPaths]                 = useState([]);
   const [showPaths, setShowPaths]         = useState(false);
   const [backfill, setBackfill]           = useState(initialSet.backfill);
+  const [flowViewConfig, setFlowViewConfig] = useState(initialSet.flowViewConfig || {
+    arrowColor: '#3498db',
+    arrowOpacity: 0.7,
+    selectedClass: null,
+    displayMode: 'total',
+  });
   const [busy, setBusy]                   = useState(false);
   const [deleting, setDeleting]           = useState(false);
   const [saved, setSaved]                 = useState(false);
@@ -463,6 +470,7 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
           value: existing?.value ?? 0,
           classes: existing?.classes ?? {},
           lastReset: existing?.lastReset ?? null,
+          arrowConfig: prev?.arrowConfig ?? existing?.arrowConfig ?? null,
         };
       });
       setCounters(merged);
@@ -511,7 +519,8 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
         name,
         zones,
         objectClasses,
-        counters: counters.map(c => ({ id: c.id, name: c.name, enabled: c.enabled })),
+        counters: counters.map(c => ({ id: c.id, name: c.name, enabled: c.enabled, arrowConfig: c.arrowConfig })),
+        flowViewConfig,
         mqtt: { enabled: mqttEnabled && !!mqttTopic, topic: mqttTopic, intervalSeconds: mqttInterval },
         recount: classesChanged,
       });
@@ -578,6 +587,39 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
       setSaveError(err?.response?.data?.error || err.message || 'Backfill failed');
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Flow view config change handler
+  const handleFlowViewConfigChange = async (newConfig) => {
+    setFlowViewConfig(newConfig);
+    setDirty(true);
+  };
+
+  // Arrow config change handler for individual counters
+  const handleCounterArrowConfigChange = (counterId, arrowConfig) => {
+    setCounters(prev => prev.map(c =>
+      c.id === counterId ? { ...c, arrowConfig } : c
+    ));
+    setDirty(true);
+  };
+
+  // Save flow view configuration (called when exiting edit mode)
+  const handleFlowViewSave = async () => {
+    try {
+      const updated = await countersAPI.update(set._id, {
+        counters: counters.map(c => ({ id: c.id, name: c.name, enabled: c.enabled, arrowConfig: c.arrowConfig })),
+        flowViewConfig,
+      });
+      if (updated) {
+        setSet(updated);
+        initialRef.current = updated;
+        setDirty(false);
+        onChanged(updated);
+      }
+    } catch (err) {
+      setSaveError(err?.response?.data?.error || err.message || 'Save failed');
+      throw err; // Re-throw so CounterFlowView knows it failed
     }
   };
 
@@ -805,6 +847,25 @@ function CounterDetail({ set: initialSet, onBack, onChanged, onDelete, readOnly 
           </div>
         );
       })()}
+
+      {/* Counter Flow View */}
+      {counters.length > 0 && snapshot && (
+        <div className="counter-flow-section">
+          <h3>Counter Flow View</h3>
+          <CounterFlowView
+            snapshot={snapshot}
+            zones={zones}
+            counters={counters}
+            days={set.days || 1}
+            flowViewConfig={flowViewConfig}
+            objectClasses={objectClasses}
+            onConfigChange={handleFlowViewConfigChange}
+            onCounterConfigChange={handleCounterArrowConfigChange}
+            onSave={handleFlowViewSave}
+            readOnly={readOnly}
+          />
+        </div>
+      )}
     </div>
   );
 }

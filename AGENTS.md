@@ -52,7 +52,8 @@ src/
     FlowHeatmap.jsx            # Middle: canvas paths overlay on camera snapshot
     DwellHeatmap.jsx           # Middle: heatmap overlay on camera snapshot
     ForensicSearch.jsx         # Middle: searchable detection table + WS video player
-    Counters.jsx               # Middle: count charts
+    Counters.jsx               # Middle: count charts + zone editor + flow view
+    CounterFlowView.jsx        # SVG arrow overlay showing traffic flow between zones
     LiveData.jsx               # Middle: real-time detection feed
     WebSocketVideoPlayer.jsx   # Video playback via /ws/video (MediaSource API)
     UserSettings.jsx           # Date format, time format, video pre/post time
@@ -173,17 +174,61 @@ Key fields on a `PathEvent` document:
 
 ---
 
-## 9. VideoX Service
+## 9. Counter Flow View
+
+The Counter Flow View provides a visual representation of traffic flow between counting zones using curved arrows overlaid on the camera image.
+
+### Features
+- **SVG Arrow Overlay**: Cubic bezier arrows connect zone centers, showing direction of traffic
+- **Count Display**: Each arrow shows the counter value (total or per-class)
+- **Display Modes**: Toggle between Total Count and Daily Average
+- **Class Filter**: Select specific object class (Human, Car, etc.) or show all
+- **Customizable Styling**: Arrow color and opacity configurable per counter set
+- **Edit Mode**: Administrators can adjust arrow endpoints, curve control points, and width
+
+### Data Model Extensions
+
+**CounterSet.flowViewConfig** (stored on counter set):
+```js
+{
+  arrowColor: '#3498db',      // Hex color for all arrows
+  arrowOpacity: 0.7,          // 0.1 to 1.0
+  selectedClass: null,        // Filter by class or null for total
+  displayMode: 'total'        // 'total' or 'average'
+}
+```
+
+**Counter.arrowConfig** (stored per counter in counters array):
+```js
+{
+  startOffset: { x: 0, y: 0 },     // Offset from source zone center (0-1000 coords)
+  endOffset: { x: 0, y: 0 },       // Offset from destination zone center
+  controlPoint1: { x, y },         // First bezier control point
+  controlPoint2: { x, y },         // Second bezier control point
+  baseWidth: 6,                    // Base stroke width in pixels
+  proportional: true               // Scale width by count value
+}
+```
+
+### Auto-Initialization
+When arrows are first displayed, sensible defaults are generated:
+- Start/end points at zone centers
+- Control points offset perpendicular to the line for natural curvature
+- Base width of 6px with proportional scaling enabled
+
+---
+
+## 10. VideoX Service
 
 - URL: `http://videox.internal` (nginx proxy, Node.js backend)
 - Auth: `Authorization: Bearer <apiKey>` header — token looked up in MongoDB `ApiToken` collection (`active: true`, not expired)
 - Clip endpoint: `GET /api/recordings/export-clip?serial=<>&start=<ISO>&end=<ISO>`
-- Returns: `video/mp4` (returns HTML if URL has double slash — see §10)
+- Returns: `video/mp4` (returns HTML if URL has double slash — see §11)
 - The API key is stored in the backend's `SystemConfig.playback.apiKey` (MongoDB) and can be overridden with `VIDEOX_API_KEY` env var
 
 ---
 
-## 10. Known Issues Fixed / Pitfalls to Avoid
+## 11. Known Issues Fixed / Pitfalls to Avoid
 
 ### Double-slash URL bug
 `SystemConfig.playback.serverUrl` may have a trailing slash (e.g., `http://videox.internal/`). When combined with `/api/...` this produces `http://videox.internal//api/...`. nginx interprets `//api/...` as the frontend app root and returns HTML. `videoService.js` strips the trailing slash before constructing the URL.
@@ -201,7 +246,7 @@ Backend used to generate a random `JWT_SECRET` on each start. Now set in `/home/
 
 ---
 
-## 11. Environment Variables
+## 12. Environment Variables
 
 ### Frontend (`dataq-analyzer-frontend/.env`)
 ```
@@ -223,7 +268,7 @@ VIDEOX_API_KEY=<key>               # Fallback if DB config has no apiKey
 
 ---
 
-## 12. Running the Stack
+## 13. Running the Stack
 
 ```bash
 # Backend (from dataq-analyzer-backend/)
@@ -240,7 +285,7 @@ node test-video-ws.mjs [serial] [iso-timestamp]
 
 ---
 
-## 13. UI Layout
+## 14. UI Layout
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -261,7 +306,7 @@ node test-video-ws.mjs [serial] [iso-timestamp]
 
 ---
 
-## 14. Styling conventions
+## 15. Styling conventions
 
 - Each component has a matching `.css` file imported directly
 - Dark theme: `.dark-theme` class on `<body>` toggles dark styles (toggled via `UserSettings`)
@@ -270,4 +315,4 @@ node test-video-ws.mjs [serial] [iso-timestamp]
 
 ---
 
-*Last updated: 2026-03-03 by GitHub Copilot (Claude Sonnet 4.6)*
+*Last updated: 2026-03-05 by GitHub Copilot (Claude Opus 4.5)*

@@ -371,6 +371,7 @@ const _toFrontendCounterSet = (cs) => {
     value:     c.total ?? c.value ?? 0,
     classes:   c.byClass instanceof Map ? Object.fromEntries(c.byClass) : (c.byClass || c.classes || {}),
     lastReset: c.lastReset || resetAt || null,
+    arrowConfig: c.arrowConfig || null,
   }));
   return {
     _id:           cs._id,
@@ -383,6 +384,12 @@ const _toFrontendCounterSet = (cs) => {
       enabled:         !!(cs.mqttTopic),
       topic:           cs.mqttTopic || '',
       intervalSeconds: cs.mqttInterval ?? 60,
+    },
+    flowViewConfig: cs.flowViewConfig || {
+      arrowColor: '#3498db',
+      arrowOpacity: 0.7,
+      selectedClass: null,
+      displayMode: 'total',
     },
     days:      cs.days ?? 0,
     backfill:  cs.backfill || null,

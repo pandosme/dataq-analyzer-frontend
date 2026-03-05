@@ -553,3 +553,17 @@
   border-radius: 8px;
   overflow-x: auto;
 }
+
+/* ─── Counter Flow View section ──────────────────────────────────────────── */
+.counter-flow-section {
+  margin-top: 24px;
+  padding: 16px;
+  background: #1a1a2e;
+  border-radius: 8px;
+}
+
+.counter-flow-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.05rem;
+  color: #aaa;
+}
