@@ -673,13 +673,13 @@ function ForensicSearch({ pathData, backgroundImage, selectedCamera, onCameraCha
     // Use user's preferred pre/post time (which may override system defaults)
     if (newSelectedPath && newSelectedPath.serial && newSelectedPath.timestamp) {
       // Calculate correct video timing:
-      // IMPORTANT: timestamp = when MQTT message sent (tracking completed/object exited)
-      // - timestamp: when object exited/tracking completed (NOT when first detected)
+      // IMPORTANT: timestamp = when the object FIRST APPEARED (entry time)
+      // - timestamp: when object first appeared/was first detected
       // - age: how long object was in scene (seconds)
-      // - Object entered at: timestamp - age
-      // - Object exited at: timestamp
-      // - Start: (timestamp - age) - preTime = timestamp - age - preTime
-      // - End: timestamp + postTime
+      // - Object entered at: timestamp
+      // - Object exited at: timestamp + age
+      // - Start: timestamp - preTime
+      // - End: timestamp + age + postTime
       // - Duration: preTime + age + postTime
       const age = newSelectedPath.age || 0;
 

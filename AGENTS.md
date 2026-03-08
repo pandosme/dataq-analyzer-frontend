@@ -141,6 +141,9 @@ Sequence:
 3. Sends: `{ type: "request_video", serial, timestamp, preTime, postTime, age, format: "mp4" }`
 4. Backend `videoHandlers.js`:
    - Calls `videoService.getVideoClip(serial, timestamp, options)`
+   - timestamp = when object first appeared (entry time)
+   - Video start = timestamp - preTime
+   - Video end = timestamp + age + postTime
    - VideoX REST call: `GET /api/recordings/export-clip?serial=<>&start=<>&end=<>` with `Authorization: Bearer <apiKey>`
    - ffmpeg fragments the MP4 (required for MediaSource API streaming)
    - ffmpeg writes to temp file (avoids PassThrough race condition — see §10)
@@ -159,7 +162,7 @@ Key fields on a `PathEvent` document:
 | Field | Type | Notes |
 |-------|------|-------|
 | `serial` | String | Camera serial number |
-| `timestamp` | Date | When detection occurred (epoch ms or ISO from API) |
+| `timestamp` | Date | When object first appeared / was first detected (entry time) |
 | `class` | String | `Car`, `Human`, `Truck`, `Bus`, `Bike`, `LicensePlate`, `Bag`, `Head`, `Animal`, `Vehicle`, `Other` |
 | `color` | String | Primary color name: `Red`, `White`, `Black`, `Blue`, `Green`, `Yellow`, `Beige`, `Gray`, `Silver`, `Orange`, `Brown` |
 | `color2` | String | Secondary color (optional, same value set as `color`) |

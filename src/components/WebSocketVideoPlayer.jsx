@@ -11,6 +11,7 @@ import './WebSocketVideoPlayer.css';
  * so the frontend doesn't need direct access to the recording server.
  *
  * Video timing:
+ * - timestamp: when object FIRST APPEARED (entry time)
  * - Start: timestamp - preTime (show before object appeared)
  * - End: timestamp + age + postTime (show until after object disappeared)
  * - Duration: preTime + age + postTime
@@ -298,9 +299,9 @@ function WebSocketVideoPlayer({ serial, timestamp, preTime, postTime, age, onErr
         };
 
         // Include timing parameters if provided (otherwise backend uses defaults)
-        // IMPORTANT: timestamp = when tracking completed (object exited), not when it entered
-        // Object timeline: entered at (timestamp - age), exited at timestamp
-        // Video should span: [(timestamp - age) - preTime] to [timestamp + postTime]
+        // IMPORTANT: timestamp = when object FIRST APPEARED (entry time)
+        // Object timeline: entered at timestamp, exited at (timestamp + age)
+        // Video should span: [timestamp - preTime] to [timestamp + age + postTime]
         if (preTime !== undefined) request.preTime = preTime;
         if (postTime !== undefined) request.postTime = postTime;
         if (age !== undefined) request.age = age;
