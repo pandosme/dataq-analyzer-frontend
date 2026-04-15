@@ -138,6 +138,8 @@ function DwellHeatmap({ pathData, backgroundImage, loading, filters, onQuery }) 
 
   /* ---------- load background image ---------- */
   useEffect(() => {
+    let cancelled = false;
+
     if (!backgroundImage) {
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
@@ -155,9 +157,11 @@ function DwellHeatmap({ pathData, backgroundImage, loading, filters, onQuery }) 
     imageRef.current = null;
 
     const img = new Image();
-    img.onload  = () => { imageRef.current = img; setImageLoaded(true); };
-    img.onerror = () => { setImageLoaded(false); };
+    img.onload  = () => { if (!cancelled) { imageRef.current = img; setImageLoaded(true); } };
+    img.onerror = () => { if (!cancelled) { setImageLoaded(false); } };
     img.src = backgroundImage;
+
+    return () => { cancelled = true; };
   }, [backgroundImage]);
 
   /* ---------- render heatmap ---------- */

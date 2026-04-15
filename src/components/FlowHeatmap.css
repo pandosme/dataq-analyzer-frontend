@@ -120,6 +120,26 @@
   overflow: hidden;
 }
 
+.image-overlay-wrapper {
+  position: relative;
+  line-height: 0;
+}
+
+.image-overlay-wrapper .background-img {
+  display: block;
+  width: 100%;
+  border: 1px solid #444;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.paths-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
 .heatmap-canvas {
   display: block;
   border: 1px solid #444;

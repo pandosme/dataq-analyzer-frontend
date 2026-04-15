@@ -1,95 +1,31 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useContainerFit from '../hooks/useContainerFit';
 import './FlowHeatmap.css';
 
 function FlowHeatmap({ pathData, backgroundImage, loading }) {
-  const canvasRef = useRef(null);
   const containerRef = useRef(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const canvasRef = useRef(null);
+  const [imgAspect, setImgAspect] = useState(null);
   const [transparency, setTransparency] = useState(0.7);
-  const imageRef = useRef(null);
 
-  // Compute image aspect ratio for container-fit sizing
-  const imageAspect = useMemo(() => {
-    if (!imageRef.current) return null;
-    return imageRef.current.width / imageRef.current.height;
-  }, [imageLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fitted = useContainerFit(containerRef, imgAspect);
 
-  const fitted = useContainerFit(containerRef, imageAspect);
-
-  // Load background image
+  // Draw paths on the transparent canvas overlay
   useEffect(() => {
-    if (!backgroundImage) {
-      console.warn('FlowHeatmap: No background image provided');
-      // Clear canvas when no background image
-      if (canvasRef.current) {
-        const ctx = canvasRef.current.getContext('2d');
-        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      }
-      setImageLoaded(false);
-      imageRef.current = null;
-      return;
-    }
-
-    // Clear canvas immediately when background image changes (before new image loads)
-    // This prevents showing old camera's image during loading
-    if (canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d');
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    }
-    setImageLoaded(false);
-    imageRef.current = null;
-
-    if (import.meta.env.DEV) {
-      console.log('FlowHeatmap: Loading image:',
-        backgroundImage.substring(0, 50) + (backgroundImage.length > 50 ? '...' : ''));
-    }
-
-    const img = new Image();
-    img.onload = () => {
-      if (import.meta.env.DEV) {
-        console.log('FlowHeatmap: Image loaded successfully', img.width, 'x', img.height);
-      }
-      imageRef.current = img;
-      setImageLoaded(true);
-    };
-    img.onerror = (e) => {
-      console.error('FlowHeatmap: Failed to load background image', e);
-      console.error('Image source:', backgroundImage.substring(0, 100));
-      setImageLoaded(false);
-    };
-    img.src = backgroundImage;
-  }, [backgroundImage]);
-
-  // Draw paths on canvas
-  useEffect(() => {
-    if (!imageLoaded) return;
-
     const canvas = canvasRef.current;
+    if (!canvas || !fitted.width || !fitted.height) return;
+
+    canvas.width = fitted.width;
+    canvas.height = fitted.height;
+
     const ctx = canvas.getContext('2d');
-    const img = imageRef.current;
-
-    // Set canvas size to fit container while preserving aspect ratio
-    canvas.width = fitted.width || img.width;
-    canvas.height = fitted.height || img.height;
-
-    // Clear canvas and draw background image
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // If no path data, just show the background
-    if (!pathData || pathData.length === 0) {
-      if (import.meta.env.DEV) {
-        console.log('FlowHeatmap: No path data, showing background only');
-      }
-      return;
-    }
+    if (!pathData || pathData.length === 0) return;
 
-    // Draw paths
     pathData.forEach((pathEvent) => {
       if (!pathEvent.path || pathEvent.path.length === 0) return;
 
-      // Set path color based on object class
       const color = getColorForClass(pathEvent.class);
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
@@ -101,7 +37,6 @@ function FlowHeatmap({ pathData, backgroundImage, loading }) {
       const startY = (firstPoint.y / 1000) * canvas.height;
       ctx.moveTo(startX, startY);
 
-      // Draw path line
       pathEvent.path.forEach((point, index) => {
         if (index === 0) return;
         const x = (point.x / 1000) * canvas.width;
@@ -110,16 +45,15 @@ function FlowHeatmap({ pathData, backgroundImage, loading }) {
       });
       ctx.stroke();
 
-      // Draw entry and exit points
       ctx.globalAlpha = 1.0;
 
-      // Entry point (green) - start of path
+      // Entry point (green)
       ctx.fillStyle = '#00ff00';
       ctx.beginPath();
       ctx.arc(startX, startY, 4, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Exit point (red) - end of path
+      // Exit point (red)
       const lastPoint = pathEvent.path[pathEvent.path.length - 1];
       const endX = (lastPoint.x / 1000) * canvas.width;
       const endY = (lastPoint.y / 1000) * canvas.height;
@@ -128,31 +62,29 @@ function FlowHeatmap({ pathData, backgroundImage, loading }) {
       ctx.arc(endX, endY, 4, 0, 2 * Math.PI);
       ctx.fill();
     });
-  }, [imageLoaded, pathData, transparency, fitted]);
+  }, [pathData, transparency, fitted]);
 
   const getColorForClass = (className) => {
     const colors = {
-      Car: '#FFFF00',           // Yellow
-      Human: '#00FF00',         // Lime
-      Truck: '#0000FF',         // Blue
-      Bus: '#FFA500',           // Orange
-      Bike: '#FF1493',          // DeepPink
-      LicensePlate: '#00BFFF',  // DeepSkyBlue
-      Bag: '#800080',           // Purple
-      Head: '#FFD700',          // Gold
-      Animal: '#7FFF00',        // Chartreuse
-      Vehicle: '#00FFFF',       // Cyan (Aqua)
-      Undefined: '#A0A0A0',    // Gray
-      Other: '#FF0000',         // Red
+      Car: '#FFFF00',
+      Human: '#00FF00',
+      Truck: '#0000FF',
+      Bus: '#FFA500',
+      Bike: '#FF1493',
+      LicensePlate: '#00BFFF',
+      Bag: '#800080',
+      Head: '#FFD700',
+      Animal: '#7FFF00',
+      Vehicle: '#00FFFF',
+      Undefined: '#A0A0A0',
+      Other: '#FF0000',
     };
-    return colors[className] || '#FF0000'; // Red for unknown
+    return colors[className] || '#FF0000';
   };
 
   return (
     <div className="flow-heatmap">
-      {/* Control Row */}
       <div className="heatmap-controls">
-        {/* Transparency Control */}
         <div className="control-group">
           <label htmlFor="transparency-slider">
             Line Transparency: {Math.round(transparency * 100)}%
@@ -170,12 +102,27 @@ function FlowHeatmap({ pathData, backgroundImage, loading }) {
       </div>
 
       <div className="canvas-container" ref={containerRef}>
-        {!imageLoaded && <div className="loading">Loading camera view...</div>}
-        <canvas
-          ref={canvasRef}
-          className="heatmap-canvas"
-          style={{ display: imageLoaded ? 'block' : 'none' }}
-        />
+        {!backgroundImage && (
+          <div className="loading">Loading camera view...</div>
+        )}
+        {backgroundImage && (
+          <div
+            className="image-overlay-wrapper"
+            style={{
+              width: fitted.width || '100%',
+              height: fitted.height || undefined,
+            }}
+          >
+            <img
+              src={backgroundImage}
+              alt="Camera view"
+              className="background-img"
+              style={{ height: fitted.height ? '100%' : 'auto' }}
+              onLoad={(e) => setImgAspect(e.target.naturalWidth / e.target.naturalHeight)}
+            />
+            <canvas ref={canvasRef} className="paths-canvas" />
+          </div>
+        )}
       </div>
     </div>
   );

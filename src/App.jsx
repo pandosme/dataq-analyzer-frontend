@@ -174,7 +174,7 @@ function App() {
   const rawSnap = cameraDetails?.snapshot?.image ?? cameraDetails?.snapshot?.base64Image ?? null;
   const backgroundImage = rawSnap
     ? (rawSnap.startsWith('data:') ? rawSnap : `data:image/jpeg;base64,${rawSnap}`)
-    : '/images/camera-placeholder.jpg';
+    : null;
 
   if (import.meta.env.DEV && (selectedApplication === 'flow-heatmap' || selectedApplication === 'dwell-heatmap')) {
     console.log(`${selectedApplication} - Background Image:`,
