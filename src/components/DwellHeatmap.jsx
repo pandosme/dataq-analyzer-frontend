@@ -74,9 +74,11 @@ function DwellHeatmap({ pathData, backgroundImage, loading, filters, onQuery }) 
   const canvasRef     = useRef(null);
   const overlayRef    = useRef(null);
   const containerRef  = useRef(null);
-  const imageRef      = useRef(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [opacity, setOpacity]         = useState(0.65);
+  const [imgAspect, setImgAspect]         = useState(null);
+  const [imgNaturalSize, setImgNaturalSize] = useState(null);
+  const [opacity, setOpacity]             = useState(0.65);
+
+  const fitted = useContainerFit(containerRef, imgAspect);
 
   // AOI state
   const [aoi, setAoi]             = useState(DEFAULT_AOI);
@@ -93,14 +95,6 @@ function DwellHeatmap({ pathData, backgroundImage, loading, filters, onQuery }) 
     const v = filters?.minIdle;
     return (v !== undefined && v !== null && v !== '' && parseFloat(v) > 0) ? parseFloat(v) : 0;
   }, [filters]);
-
-  /* ---------- image aspect ratio ---------- */
-  const imageAspect = useMemo(() => {
-    if (!imageRef.current) return null;
-    return imageRef.current.width / imageRef.current.height;
-  }, [imageLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fitted = useContainerFit(containerRef, imageAspect);
 
   /* ---------- idle-time range from dataset ---------- */
   const idleRange = useMemo(() => {
@@ -136,47 +130,29 @@ function DwellHeatmap({ pathData, backgroundImage, loading, filters, onQuery }) 
     return c;
   }, [pathData, idleThreshold]);
 
-  /* ---------- load background image ---------- */
+  /* ---------- clear canvas when image changes ---------- */
   useEffect(() => {
-    let cancelled = false;
-
     if (!backgroundImage) {
+      setImgAspect(null);
+      setImgNaturalSize(null);
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       }
-      setImageLoaded(false);
-      imageRef.current = null;
-      return;
     }
-    if (canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d');
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    }
-    setImageLoaded(false);
-    imageRef.current = null;
-
-    const img = new Image();
-    img.onload  = () => { if (!cancelled) { imageRef.current = img; setImageLoaded(true); } };
-    img.onerror = () => { if (!cancelled) { setImageLoaded(false); } };
-    img.src = backgroundImage;
-
-    return () => { cancelled = true; };
   }, [backgroundImage]);
 
   /* ---------- render heatmap ---------- */
   useEffect(() => {
-    if (!imageLoaded || !imageRef.current || !canvasRef.current) return;
+    if (!imgNaturalSize || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx    = canvas.getContext('2d');
-    const img    = imageRef.current;
 
-    canvas.width  = fitted.width  || img.width;
-    canvas.height = fitted.height || img.height;
+    canvas.width  = fitted.width  || imgNaturalSize.width;
+    canvas.height = fitted.height || imgNaturalSize.height;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
     if (!pathData || pathData.length === 0) return;
 
@@ -247,7 +223,7 @@ function DwellHeatmap({ pathData, backgroundImage, loading, filters, onQuery }) 
       ctx.fillText('AOI', ax + 4, ay - 5);
     }
 
-  }, [imageLoaded, pathData, opacity, idleThreshold, aoi, aoiEditing, isFullImage, fitted]);
+  }, [imgNaturalSize, pathData, opacity, idleThreshold, aoi, aoiEditing, isFullImage, fitted]);
 
   /* ========== AOI overlay drawing ========== */
   const drawOverlay = useCallback((a) => {
@@ -479,24 +455,41 @@ function DwellHeatmap({ pathData, backgroundImage, loading, filters, onQuery }) 
       {/* ---- Canvas ---- */}
       <div className="canvas-container" ref={containerRef}>
         {loading && <div className="loading">Loading…</div>}
-        {!imageLoaded && !loading && <div className="loading">Loading camera view…</div>}
-        <div className="canvas-wrapper">
-          <canvas
-            ref={canvasRef}
-            className="heatmap-canvas"
-            style={{ display: imageLoaded ? 'block' : 'none' }}
-          />
-          {aoiEditing && imageLoaded && (
-            <canvas
-              ref={overlayRef}
-              className="aoi-overlay"
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
+        {!backgroundImage && !loading && <div className="loading">Loading camera view…</div>}
+        {backgroundImage && (
+          <div
+            className="canvas-wrapper"
+            style={{
+              width: fitted.width || '100%',
+              height: fitted.height || undefined,
+            }}
+          >
+            <img
+              src={backgroundImage}
+              alt="Camera view"
+              className="background-img"
+              style={{ height: fitted.height ? '100%' : 'auto' }}
+              onLoad={(e) => {
+                setImgAspect(e.target.naturalWidth / e.target.naturalHeight);
+                setImgNaturalSize({ width: e.target.naturalWidth, height: e.target.naturalHeight });
+              }}
             />
-          )}
-        </div>
+            <canvas
+              ref={canvasRef}
+              className="heatmap-canvas"
+            />
+            {aoiEditing && (
+              <canvas
+                ref={overlayRef}
+                className="aoi-overlay"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

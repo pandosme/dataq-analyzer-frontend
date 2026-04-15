@@ -21,7 +21,7 @@
   background: #f8f9fa;
   overflow: auto;
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: flex-start;
   padding: 0;
 }
